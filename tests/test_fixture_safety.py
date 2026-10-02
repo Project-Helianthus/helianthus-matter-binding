@@ -24,6 +24,8 @@ class FixtureSafetyTest(unittest.TestCase):
         self.assertEqual(text.count('TMPDIR="$work" HOME="$work/home"'), 3)
         self.assertIn('[[ -s "$work/chip_tool_kvs" ]]', text)
         self.assertIn("external_tmp/chip_tool_config.ini", text)
+        self.assertIn(r"0x0*510|\b1296\b", text)
+        self.assertNotIn(r"0x0*510|\b1280\b", text)
 
     @unittest.skipUnless(shutil.which("setsid") and shutil.which("timeout"), "requires Linux process-group tools")
     def test_forced_timeout_reaps_descendants_and_preserves_unrelated_tmp_state(self) -> None:

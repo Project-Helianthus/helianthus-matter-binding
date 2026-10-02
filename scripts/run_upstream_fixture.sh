@@ -43,7 +43,7 @@ grep -q "Server initialization complete" "$work/app.log"
 TMPDIR="$work" HOME="$work/home" timeout 120 "$tool" pairing onnetwork 1 20202021
 TMPDIR="$work" HOME="$work/home" timeout 60 "$tool" descriptor read device-type-list 1 1 | tee "$work/device-types.log"
 TMPDIR="$work" HOME="$work/home" timeout 60 "$tool" descriptor read server-list 1 1 | tee "$work/server-list.log"
-grep -Eiq '(0x0*510|\b1280\b)' "$work/device-types.log"
+grep -Eiq '(0x0*510|\b1296\b)' "$work/device-types.log"
 grep -Eiq '(0x0*1[dD]|\b29\b)' "$work/server-list.log"
 grep -Eiq '(0x0*90|\b144\b)' "$work/server-list.log"
 grep -Eiq '(0x0*9[cC]|\b156\b)' "$work/server-list.log"
