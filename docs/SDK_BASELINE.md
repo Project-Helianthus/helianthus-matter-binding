@@ -46,8 +46,9 @@ commissions the sample and verifies an `ActiveCurrent` read after the sample's
 test event. The fixture does not use the SDK runner's broad `--factory-reset`;
 all explicit sample fabric and controller state belongs to its unique temporary
 directory. The direct `chip-tool` calls bind `TMPDIR` to that directory, assert
-that their `chip_tool_kvs` store was created there, and verify an external
-sentinel was unchanged. The pinned Linux binaries also use compile-time `/tmp`
+that their default and alpha commissioner storage plus platform KVS were created
+there, and verify an external sentinel was unchanged. The pinned Linux binaries
+also use compile-time `/tmp`
 defaults for generic factory, configuration, and counter bookkeeping; the
 workflow therefore runs on a fresh hosted runner and does not treat those files
 as reusable Helianthus state.

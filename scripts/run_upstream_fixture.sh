@@ -47,7 +47,9 @@ grep -Eiq '(0x0*510|\b1296\b)' "$work/device-types.log"
 grep -Eiq '(0x0*1[dD]|\b29\b)' "$work/server-list.log"
 grep -Eiq '(0x0*90|\b144\b)' "$work/server-list.log"
 grep -Eiq '(0x0*9[cC]|\b156\b)' "$work/server-list.log"
-[[ -s "$work/chip_tool_kvs" ]]
+[[ -s "$work/chip_tool_config.ini" ]]
+[[ -s "$work/chip_tool_config.alpha.ini" ]]
+[[ -f "$work/chip_tool_kvs" ]]
 grep -qx 'preserve' "$external_tmp/chip_tool_config.ini"
 kill "$app_pid"
 wait "$app_pid" || true
