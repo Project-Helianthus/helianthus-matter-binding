@@ -44,9 +44,13 @@ temporary KVS path, the SDK's public test passcode and discriminator, and a
 temporary controller storage path. It then invokes the SDK's EPM test which
 commissions the sample and verifies an `ActiveCurrent` read after the sample's
 test event. The fixture does not use the SDK runner's broad `--factory-reset`;
-all KVS and controller state belongs to its unique temporary directory. The
-direct `chip-tool` calls bind `TMPDIR` to that directory, assert that their
-configuration was created there, and verify an external sentinel was unchanged.
+all explicit sample fabric and controller state belongs to its unique temporary
+directory. The direct `chip-tool` calls bind `TMPDIR` to that directory, assert
+that their `chip_tool_kvs` store was created there, and verify an external
+sentinel was unchanged. The pinned Linux binaries also use compile-time `/tmp`
+defaults for generic factory, configuration, and counter bookkeeping; the
+workflow therefore runs on a fresh hosted runner and does not treat those files
+as reusable Helianthus state.
 The script removes owned storage, terminates the directly started app through an EXIT
 trap, and runs SDK helpers in a separately owned process group that is terminated
 and reaped on success, failure, or timeout. It never reads a private network,

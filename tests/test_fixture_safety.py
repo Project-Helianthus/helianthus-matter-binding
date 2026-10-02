@@ -22,7 +22,7 @@ class FixtureSafetyTest(unittest.TestCase):
         self.assertNotIn("--factory-reset", text)
         self.assertIn("run_owned_group.sh", text)
         self.assertEqual(text.count('TMPDIR="$work" HOME="$work/home"'), 3)
-        self.assertIn("chip_tool_config*.ini", text)
+        self.assertIn('[[ -s "$work/chip_tool_kvs" ]]', text)
         self.assertIn("external_tmp/chip_tool_config.ini", text)
 
     @unittest.skipUnless(shutil.which("setsid") and shutil.which("timeout"), "requires Linux process-group tools")
