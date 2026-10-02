@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "status": "proposed",
+  "profile_id": "replace-with-reviewed-profile-id",
+  "target_commit": "29b4768a513cf566011ab8cd60df1bc495204953",
+  "mapping": {
+    "repository": "https://github.com/Project-Helianthus/helianthus-docs-semantic.git",
+    "commit": "30f5e5c79ac6da3a7c7c10c990599906d1dfd0cb",
+    "path": "api/v1/targets/matter-1.7-ballot-0.9-v1.json",
+    "sha256": "5ae81d5e0971d25ead08f982fdf31caf47ada4838d0ee6f2b3e719d11a6df39c"
+  },
+  "device_type": {"name": "Electrical Sensor", "id": "0x0510", "revision": 2},
+  "clusters": [
+    {"id": "0x001D", "name": "Descriptor", "evidence": ""},
+    {"id": "0x009C", "name": "Power Topology", "evidence": ""},
+    {"id": "0x0090", "name": "Electrical Power Measurement", "evidence": ""}
+  ],
+  "electrical_power_measurement": {
+    "power_mode": {"value": "", "evidence": ""},
+    "number_of_measurement_types": {"value": 0, "evidence": ""},
+    "accuracy": [],
+    "active_power": {"value": null, "evidence": ""}
+  }
+}

@@ -1,0 +1,56 @@
+name: Matter SDK baseline
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  exact-sdk-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate repository lock and fail-closed mutations
+        run: |
+          python3 tools/validate_lock.py
+          python3 -m unittest discover -s tests -v
+      - name: Install public Linux build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            avahi-daemon build-essential clang cmake curl default-jre git \
+            libavahi-client-dev libdbus-1-dev libevent-dev libglib2.0-dev \
+            libgirepository1.0-dev libjsoncpp-dev libnss-mdns libreadline-dev \
+            libssl-dev ninja-build pkg-config python3-dev python3-pip python3-venv \
+            unzip
+      - name: Clean recursive exact-SHA checkout
+        run: scripts/checkout_sdk.sh "$RUNNER_TEMP/connectedhomeip"
+      - name: Bootstrap exact SDK environment
+        working-directory: ${{ runner.temp }}/connectedhomeip
+        run: source scripts/bootstrap.sh
+      - name: Build code-driven app and controller
+        working-directory: ${{ runner.temp }}/connectedhomeip
+        run: |
+          source scripts/activate.sh
+          ./scripts/build/build_examples.py --target linux-x64-all-devices-clang build
+          ./scripts/build/build_examples.py --target linux-x64-chip-tool-clang build
+      - name: Build and run focused cluster tests
+        working-directory: ${{ runner.temp }}/connectedhomeip
+        run: |
+          source scripts/activate.sh
+          gn gen --check --fail-on-unused-args out/focused-tests --args='chip_build_tests=true chip_link_tests=true'
+          ninja -C out/focused-tests src/app/clusters/electrical-power-measurement-server/tests:tests
+          ninja -C out/focused-tests src/app/clusters/power-topology-server/tests:tests
+          out/focused-tests/tests/TestElectricalPowerMeasurementCluster
+          out/focused-tests/tests/TestPowerTopologyCluster
+      - name: Run bounded upstream Electrical Sensor fixture
+        run: |
+          sudo service avahi-daemon start
+          scripts/run_upstream_fixture.sh "$RUNNER_TEMP/connectedhomeip"

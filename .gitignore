@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+.venv/
+out/
+connectedhomeip/
+*.kvs
+admin_storage.json
