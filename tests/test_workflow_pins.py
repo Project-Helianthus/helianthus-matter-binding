@@ -65,6 +65,31 @@ class WorkflowPinTest(unittest.TestCase):
         self.assertEqual(check(f"call: {{uses: owner/repo/.github/workflows/x.yml@{SHA}}}"), [])
         self.assertEqual(check(f"uses: owner/repo/.github/workflows/x.yml@{SHA}"), [])
 
+    def test_quoted_hash_does_not_hide_uses(self) -> None:
+        self.assertTrue(check('- {name: "x # y", uses: actions/checkout@v4}'))
+        self.assertTrue(check("- {name: 'x # y', uses: actions/checkout@v4}"))
+        self.assertTrue(check('call: {name: "a # b", uses: owner/repo/.github/workflows/x.yml@main}'))
+        self.assertEqual(check(f'- {{name: "x # y", uses: actions/checkout@{SHA}}}'), [])
+
+    def test_values_of_other_keys_are_never_inspected(self) -> None:
+        self.assertEqual(check('- run: echo "uses: actions/checkout@v4"'), [])
+        self.assertEqual(check("- name: uses: actions/checkout@v4"), [])
+        self.assertEqual(check("- run: |", "    uses: actions/checkout@v4", "    echo ok"), [])
+        self.assertEqual(check("- {run: 'echo uses: a@v4', name: x}"), [])
+
+    def test_multiline_flow_mapping(self) -> None:
+        self.assertEqual(check("- {", f"    uses: actions/checkout@{SHA},", "    name: x", "  }"), [])
+        self.assertEqual(check("- {", f"    uses:", f"      actions/checkout@{SHA}", "  }"), [])
+        self.assertTrue(check("- {", "    name: x,", "    uses: actions/checkout@v4", "  }"))
+        self.assertTrue(check("- [", "    {uses: actions/checkout@main}", "  ]"))
+
+    def test_mutable_reusable_workflow_flow_form_fails(self) -> None:
+        self.assertTrue(check("j: { uses: owner/repo/.github/workflows/x.yml@v1, with: {a: 1} }"))
+
+    def test_unterminated_input_fails_closed(self) -> None:
+        self.assertTrue(check('- { name: "oops, uses: actions/checkout@v4 }'))
+        self.assertTrue(check("- { uses: actions/checkout@v4"))
+
     def test_comment_mentions_are_ignored(self) -> None:
         self.assertEqual(check("# uses: actions/checkout@v4", f"- uses: a/b@{SHA} # uses: x@v1"), [])
 

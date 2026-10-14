@@ -38,31 +38,183 @@ def validate_checkout(lock: dict, checkout: Path) -> list[str]:
     return reasons
 
 
-USES_TOKEN = re.compile(r"""(?<![\w.-])["']?uses["']?\s*:[ \t]*(?P<value>[^,}\]#\n]*)""")
 SHA_PIN = re.compile(r"^[^@\s'\"]+@[0-9a-f]{40}$")
 DIGEST_PIN = re.compile(r"^docker://[^@\s'\"]+@sha256:[0-9a-f]{64}$")
+FLOW_END = ",}]"
+
+
+class WorkflowSyntaxError(ValueError):
+    """The workflow uses YAML this fail-closed scanner does not understand."""
+
+
+class _UsesScanner:
+    """Quote-aware scanner for the YAML subset in workflows; reports values of mapping keys named `uses`."""
+
+    def __init__(self, text: str) -> None:
+        self.text = text
+        self.n = len(text)
+        self.found: list[tuple[int, str]] = []
+
+    def line_of(self, i: int) -> int:
+        return self.text.count("\n", 0, i) + 1
+
+    def quoted(self, i: int) -> tuple[str, int]:
+        quote = self.text[i]
+        j = i + 1
+        out: list[str] = []
+        while j < self.n:
+            c = self.text[j]
+            if quote == '"' and c == "\\":
+                out.append(self.text[j : j + 2])
+                j += 2
+                continue
+            if c == quote:
+                if quote == "'" and self.text[j + 1 : j + 2] == "'":
+                    out.append("'")
+                    j += 2
+                    continue
+                return "".join(out), j + 1
+            out.append(c)
+            j += 1
+        raise WorkflowSyntaxError(f"line {self.line_of(i)}: unterminated quoted string")
+
+    def at_colon(self, j: int, flow: bool) -> bool:
+        if self.text[j : j + 1] != ":":
+            return False
+        nxt = self.text[j + 1 : j + 2]
+        return nxt == "" or nxt in " \t\r\n" or (flow and nxt in FLOW_END)
+
+    def plain(self, i: int, flow: bool) -> tuple[str, int]:
+        j = i
+        while j < self.n:
+            c = self.text[j]
+            if c == "\n" or (c == "#" and j > i and self.text[j - 1] in " \t"):
+                break
+            if flow and c in FLOW_END:
+                break
+            if self.at_colon(j, flow):
+                break
+            j += 1
+        return self.text[i:j].strip(), j
+
+    def scalar(self, i: int, flow: bool) -> tuple[str, int]:
+        if self.text[i] in "'\"":
+            return self.quoted(i)
+        return self.plain(i, flow)
+
+    def skip(self, i: int, newlines: bool) -> int:
+        while i < self.n:
+            c = self.text[i]
+            if c in " \t\r" or (newlines and c == "\n"):
+                i += 1
+            elif c == "#" and (i == 0 or self.text[i - 1] in " \t\r\n"):
+                while i < self.n and self.text[i] != "\n":
+                    i += 1
+            else:
+                break
+        return i
+
+    def record(self, key: str, value: str, at: int) -> None:
+        if key == "uses":
+            self.found.append((self.line_of(at), value))
+
+    def flow(self, i: int) -> int:
+        close = "}" if self.text[i] == "{" else "]"
+        i += 1
+        while True:
+            i = self.skip(i, True)
+            if i >= self.n:
+                raise WorkflowSyntaxError("unterminated flow collection")
+            if self.text[i] == close:
+                return i + 1
+            if self.text[i] == ",":
+                i += 1
+                continue
+            i = self.entry(i, True)
+
+    def entry(self, i: int, flow: bool) -> int:
+        """Parse `key: value` or a bare item starting at i inside a flow collection."""
+        if self.text[i] in "{[":
+            return self.flow(i)
+        key, j = self.scalar(i, True)
+        k = self.skip(j, True)
+        if not self.at_colon(k, True):
+            if j == i:
+                raise WorkflowSyntaxError(f"line {self.line_of(i)}: unparseable flow entry")
+            return j
+        k = self.skip(k + 1, True)
+        if k < self.n and self.text[k] in "{[":
+            return self.flow(k)
+        value, end = (self.scalar(k, True) if k < self.n and self.text[k] not in FLOW_END else ("", k))
+        self.record(key, value, i)
+        return end
+
+    def run(self) -> list[tuple[int, str]]:
+        i = 0
+        skip_over = -1  # block-scalar body: skip lines indented deeper than this column
+        while i < self.n:
+            eol = self.text.find("\n", i)
+            eol = self.n if eol < 0 else eol
+            line = self.text[i:eol]
+            stripped = line.strip()
+            indent = len(line) - len(line.lstrip(" "))
+            if skip_over >= 0:
+                if not stripped or indent > skip_over:
+                    i = eol + 1
+                    continue
+                skip_over = -1
+            if not stripped or stripped.startswith("#") or stripped in ("---", "..."):
+                i = eol + 1
+                continue
+            col = i + indent
+            while self.text[col : col + 1] == "-" and (col + 1 >= eol or self.text[col + 1] in " \t"):
+                col = self.skip(col + 1, False)
+            if col >= eol:
+                i = eol + 1
+                continue
+            end = eol
+            if self.text[col] in "{[":
+                end = self.flow(col)
+            else:
+                key, j = self.scalar(col, False)
+                j = self.skip(j, False)
+                if self.at_colon(j, False):
+                    v = self.skip(j + 1, False)
+                    if v >= eol:
+                        self.record(key, "", col)
+                    elif self.text[v] in "|>":
+                        skip_over = col - i
+                        self.record(key, "", col)
+                    elif self.text[v] in "{[":
+                        end = self.flow(v)
+                    else:
+                        value, end = self.scalar(v, False)
+                        self.record(key, value, col)
+            nl = self.text.find("\n", end)
+            i = self.n if nl < 0 else nl + 1
+        return self.found
 
 
 def validate_workflow_pins(directory: Path) -> list[str]:
-    """Require every `uses:` token, in any YAML form, to be an immutable SHA or image digest.
+    """Require every mapping key named `uses` (jobs.*.uses and steps[].uses, any YAML form) to be immutable.
 
-    The raw text is scanned (no YAML dependency), so block, flow-mapping, flow-sequence,
-    quoted and reusable-workflow forms are all covered. A token without a parseable ref fails.
+    A ref must be a full commit SHA or image digest, or a local `./` path. Values of other keys are never
+    inspected. Unparseable workflow YAML fails closed. No YAML dependency is added to this repository.
     """
     reasons: list[str] = []
     files = sorted([*directory.glob("*.yml"), *directory.glob("*.yaml")]) if directory.is_dir() else []
     if not files:
         return [f"no workflow files found in {directory}"]
     for path in files:
-        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            line = re.sub(r"(^|\s)#.*$", "", line)
-            for match in USES_TOKEN.finditer(line):
-                value = match.group("value").strip()
-                if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
-                    value = value[1:-1].strip()
-                if value.startswith("./") or SHA_PIN.match(value) or DIGEST_PIN.match(value):
-                    continue
-                reasons.append(f"{path.name}:{number} action is not pinned by immutable commit SHA: {value or '<empty>'}")
+        try:
+            found = _UsesScanner(path.read_text(encoding="utf-8")).run()
+        except (WorkflowSyntaxError, OSError, UnicodeDecodeError) as exc:
+            reasons.append(f"{path.name}: cannot scan workflow for action pins: {exc}")
+            continue
+        for number, value in found:
+            if value.startswith("./") or SHA_PIN.match(value) or DIGEST_PIN.match(value):
+                continue
+            reasons.append(f"{path.name}:{number} action is not pinned by immutable commit SHA: {value or '<empty>'}")
     return reasons
 
 
