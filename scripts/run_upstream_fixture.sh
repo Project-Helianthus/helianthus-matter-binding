@@ -58,9 +58,12 @@ app_pid=""
 # The upstream EPM test starts a fresh sample, commissions it through its Python
 # controller, triggers the SDK's fake load, and checks numeric ActiveCurrent.
 cd "$sdk_checkout"
-"$repo_root/scripts/run_owned_group.sh" 300 ./scripts/build_python.sh -i "$work/venv" --enable_ipv4 true
+# Hosted evidence (run 37048946183): the Python controller build was at ninja
+# step 564 of 1033 when the former 300 s cap killed it, so it needs a bound that
+# reflects a cold -O0 compile. Both bounds stay finite and fail closed (exit 124).
+"$repo_root/scripts/run_owned_group.sh" 1500 ./scripts/build_python.sh -i "$work/venv" --enable_ipv4 true
 source "$work/venv/bin/activate"
-"$repo_root/scripts/run_owned_group.sh" 300 ./scripts/tests/run_python_test.py \
+"$repo_root/scripts/run_owned_group.sh" 600 ./scripts/tests/run_python_test.py \
   --app "$app" \
   --app-args "--device electrical-sensor:1 --discriminator 1234 --KVS $work/fixture.kvs --enable-key 000102030405060708090a0b0c0d0e0f" \
   --script src/python_testing/TC_EPM_2_2.py \
