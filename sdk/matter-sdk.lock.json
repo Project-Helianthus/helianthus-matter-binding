@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "accepted_runtime_composition_profile_sha256": null,
+  "sdk": {
+    "repository": "https://github.com/AryaHassanli/connectedhomeip.git",
+    "commit": "29b4768a513cf566011ab8cd60df1bc495204953",
+    "upstream_merge": {
+      "repository": "https://github.com/project-chip/connectedhomeip.git",
+      "pull_request": 73842,
+      "commit": "bd73b5141729af92f3d021aeecaa53d9e0cadb89"
+    },
+    "data_model": {
+      "version": "1.7",
+      "spec_sha": {"path": "data_model/1.7/spec_sha", "blob": "86ef3bbd871805600c751bd84c639cfb0af64ed9"},
+      "spec_tag": {"path": "data_model/1.7/spec_tag", "blob": "df6ffc2f98235eea1a41493e971ef53e69084425"}
+    },
+    "blobs": [
+      {"path": "data_model/1.7/device_types/ElectricalSensor.xml", "blob": "b6235fc64f44d4db2c42d05dc1e9b1f6f51dedfd"},
+      {"path": "data_model/1.7/clusters/ElectricalPowerMeasurement.xml", "blob": "3349108215d56ad61a950a3ad874ea9773499cb5"},
+      {"path": "zzz_generated/app-common/clusters/ElectricalPowerMeasurement/AttributeIds.h", "blob": "8f95703c7a97c8c86752695446220a900819fd28"},
+      {"path": "examples/all-devices-app/all-devices-common/device/types/electrical-sensor/ElectricalSensor.cpp", "blob": "3f937a355870efc38f512ee40a38007ca4cc6bd3"}
+    ]
+  },
+  "mapping": {
+    "repository": "https://github.com/Project-Helianthus/helianthus-docs-semantic.git",
+    "commit": "30f5e5c79ac6da3a7c7c10c990599906d1dfd0cb",
+    "path": "api/v1/targets/matter-1.7-ballot-0.9-v1.json",
+    "sha256": "5ae81d5e0971d25ead08f982fdf31caf47ada4838d0ee6f2b3e719d11a6df39c"
+  },
+  "target": {
+    "device_type": {"name": "Electrical Sensor", "id": "0x0510", "revision": 2},
+    "power_topology_cluster": {"name": "Power Topology", "id": "0x009C", "revision": 2},
+    "electrical_power_measurement_cluster": {"name": "Electrical Power Measurement", "id": "0x0090", "revision": 3},
+    "active_current_attribute": {"name": "ActiveCurrent", "id": "0x0005", "optional": true},
+    "linux_app": "examples/all-devices-app/posix",
+    "controller": "examples/chip-tool"
+  }
+}
