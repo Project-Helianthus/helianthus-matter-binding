@@ -90,6 +90,39 @@ class WorkflowPinTest(unittest.TestCase):
         self.assertTrue(check('- { name: "oops, uses: actions/checkout@v4 }'))
         self.assertTrue(check("- { uses: actions/checkout@v4"))
 
+    def test_json_style_and_escaped_keys(self) -> None:
+        for line in (
+            '- {"uses":"actions/checkout@v4"}',
+            '- {"uses":actions/checkout@v4}',
+            "- {'uses':'actions/checkout@v4'}",
+            '- {"uses":{}}',
+            '- {"\\u0075ses": "actions/checkout@v4"}',
+            '- {"u\\x73es": "actions/checkout@v4"}',
+            '- {"\\165ses": "actions/checkout@v4"}',
+            '- "uses":"actions/checkout@v4"',
+            '- "\\u0075ses": actions/checkout@v4',
+        ):
+            with self.subTest(line=line):
+                self.assertTrue(check(line))
+
+    def test_json_style_pinned_passes(self) -> None:
+        self.assertEqual(check(f'- {{"uses":"actions/checkout@{SHA}","name":"x"}}'), [])
+        self.assertEqual(check(f'- {{"\\u0075ses": "actions/checkout@{SHA}"}}'), [])
+
+    def test_adversarial_shapes(self) -> None:
+        self.assertTrue(check("- [{a: [{b: {uses: actions/checkout@v4}}]}]"))
+        self.assertTrue(check("- uses   : actions/checkout@v4"))
+        self.assertTrue(check("- { uses   : actions/checkout@v4 }"))
+        self.assertTrue(check("\t- uses: actions/checkout@v4"))
+        self.assertTrue(check("- {a: 1,\tuses: actions/checkout@v4}"))
+        self.assertEqual(check(f"- uses   : actions/checkout@{SHA}"), [])
+
+    def test_anchor_tag_and_explicit_key_prefixes(self) -> None:
+        for line in ("- &a uses: actions/checkout@v4", "- !!str uses: actions/checkout@v4", "- ? uses\n  : actions/checkout@v4",
+                     "- {&a uses: actions/checkout@v4}", "- {? uses : actions/checkout@v4}"):
+            with self.subTest(line=line):
+                self.assertTrue(check(line))
+
     def test_comment_mentions_are_ignored(self) -> None:
         self.assertEqual(check("# uses: actions/checkout@v4", f"- uses: a/b@{SHA} # uses: x@v1"), [])
 
