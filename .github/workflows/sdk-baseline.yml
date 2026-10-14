@@ -27,7 +27,7 @@ jobs:
           sudo apt-get install --no-install-recommends -y \
             avahi-daemon build-essential clang cmake curl default-jre git \
             libavahi-client-dev libdbus-1-dev libevent-dev libglib2.0-dev \
-            libgirepository1.0-dev libjsoncpp-dev libnss-mdns libreadline-dev \
+            libcairo2-dev libgirepository1.0-dev libjsoncpp-dev libnss-mdns libreadline-dev \
             libssl-dev ninja-build pkg-config python3-dev python3-pip python3-venv \
             unzip
       - name: Clean recursive exact-SHA checkout
