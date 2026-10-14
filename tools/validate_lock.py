@@ -38,28 +38,31 @@ def validate_checkout(lock: dict, checkout: Path) -> list[str]:
     return reasons
 
 
-USES_LINE = re.compile(r"""^\s*(?:-\s+)?["']?uses["']?\s*:\s*(?P<value>.*?)\s*(?:#.*)?$""")
+USES_TOKEN = re.compile(r"""(?<![\w.-])["']?uses["']?\s*:[ \t]*(?P<value>[^,}\]#\n]*)""")
 SHA_PIN = re.compile(r"^[^@\s'\"]+@[0-9a-f]{40}$")
 DIGEST_PIN = re.compile(r"^docker://[^@\s'\"]+@sha256:[0-9a-f]{64}$")
 
 
 def validate_workflow_pins(directory: Path) -> list[str]:
-    """Require every non-local `uses:` to be an immutable full commit SHA or image digest."""
+    """Require every `uses:` token, in any YAML form, to be an immutable SHA or image digest.
+
+    The raw text is scanned (no YAML dependency), so block, flow-mapping, flow-sequence,
+    quoted and reusable-workflow forms are all covered. A token without a parseable ref fails.
+    """
     reasons: list[str] = []
     files = sorted([*directory.glob("*.yml"), *directory.glob("*.yaml")]) if directory.is_dir() else []
     if not files:
         return [f"no workflow files found in {directory}"]
     for path in files:
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            if "uses" not in line:
-                continue
-            match = USES_LINE.match(line)
-            if not match:
-                continue
-            value = match.group("value")
-            if value.startswith("./") or SHA_PIN.match(value) or DIGEST_PIN.match(value):
-                continue
-            reasons.append(f"{path.name}:{number} action is not pinned by immutable commit SHA: {value or '<empty>'}")
+            line = re.sub(r"(^|\s)#.*$", "", line)
+            for match in USES_TOKEN.finditer(line):
+                value = match.group("value").strip()
+                if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+                    value = value[1:-1].strip()
+                if value.startswith("./") or SHA_PIN.match(value) or DIGEST_PIN.match(value):
+                    continue
+                reasons.append(f"{path.name}:{number} action is not pinned by immutable commit SHA: {value or '<empty>'}")
     return reasons
 
 

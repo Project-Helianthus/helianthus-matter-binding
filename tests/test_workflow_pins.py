@@ -46,6 +46,28 @@ class WorkflowPinTest(unittest.TestCase):
         self.assertTrue(check('- "uses": actions/checkout@v4'))
         self.assertTrue(check("uses: docker://alpine:3.19"))
 
+    def test_flow_and_nested_forms_fail(self) -> None:
+        for line in (
+            "- { uses: actions/checkout@v4 }",
+            "steps: [{uses: actions/checkout@v4}]",
+            "call: {uses: owner/repo/.github/workflows/x.yml@main}",
+            '- { "uses": "actions/checkout@v4" }',
+            "- {uses: 'actions/checkout@v4', name: x}",
+            "- { uses: }",
+            "- uses:",
+        ):
+            with self.subTest(line=line):
+                self.assertTrue(check(line))
+
+    def test_pinned_flow_and_reusable_workflow_pass(self) -> None:
+        self.assertEqual(check(f"- {{ uses: actions/checkout@{SHA} }}"), [])
+        self.assertEqual(check(f'- {{ "uses": "actions/checkout@{SHA}", name: x }}'), [])
+        self.assertEqual(check(f"call: {{uses: owner/repo/.github/workflows/x.yml@{SHA}}}"), [])
+        self.assertEqual(check(f"uses: owner/repo/.github/workflows/x.yml@{SHA}"), [])
+
+    def test_comment_mentions_are_ignored(self) -> None:
+        self.assertEqual(check("# uses: actions/checkout@v4", f"- uses: a/b@{SHA} # uses: x@v1"), [])
+
     def test_missing_workflow_directory_fails(self) -> None:
         self.assertTrue(validate_workflow_pins(ROOT / "no-such-dir"))
 
