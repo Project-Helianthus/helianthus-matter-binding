@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -37,6 +38,31 @@ def validate_checkout(lock: dict, checkout: Path) -> list[str]:
     return reasons
 
 
+USES_LINE = re.compile(r"""^\s*(?:-\s+)?["']?uses["']?\s*:\s*(?P<value>.*?)\s*(?:#.*)?$""")
+SHA_PIN = re.compile(r"^[^@\s'\"]+@[0-9a-f]{40}$")
+DIGEST_PIN = re.compile(r"^docker://[^@\s'\"]+@sha256:[0-9a-f]{64}$")
+
+
+def validate_workflow_pins(directory: Path) -> list[str]:
+    """Require every non-local `uses:` to be an immutable full commit SHA or image digest."""
+    reasons: list[str] = []
+    files = sorted([*directory.glob("*.yml"), *directory.glob("*.yaml")]) if directory.is_dir() else []
+    if not files:
+        return [f"no workflow files found in {directory}"]
+    for path in files:
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if "uses" not in line:
+                continue
+            match = USES_LINE.match(line)
+            if not match:
+                continue
+            value = match.group("value")
+            if value.startswith("./") or SHA_PIN.match(value) or DIGEST_PIN.match(value):
+                continue
+            reasons.append(f"{path.name}:{number} action is not pinned by immutable commit SHA: {value or '<empty>'}")
+    return reasons
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--lock", type=Path, default=ROOT / "sdk" / "matter-sdk.lock.json")
@@ -49,6 +75,7 @@ def main() -> int:
         print(f"FAIL: cannot read lock: {exc}", file=sys.stderr)
         return 1
     reasons = list(validate_lock(lock))
+    reasons.extend(validate_workflow_pins(ROOT / ".github" / "workflows"))
     if not reasons and args.sdk_checkout:
         reasons.extend(validate_checkout(lock, args.sdk_checkout))
     if not reasons and args.mapping:
