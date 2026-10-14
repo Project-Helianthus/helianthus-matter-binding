@@ -14,6 +14,8 @@ fixture, target contract, or readiness logic. Record commands and outcomes in
 the PR. Request an independent review of the exact final head; resolve P0-P2
 findings before merge.
 
+Workflow authors must stay within the YAML subset that `tools/validate_lock.py` accepts (block mappings and sequences, plain or quoted scalars, block scalars, and property-free flow collections; no anchors, aliases, tags, merge or explicit keys, BOM, or extra document markers), because the workflow action-pin check rejects anything else.
+
 Do not add credentials, fabric storage, attestation material, private captures,
 personal device identifiers, network coordinates, or a real-device test result.
 No change authorizes production commissioning, deployment, endpoint allocation,

@@ -139,15 +139,15 @@ class _UsesScanner:
                 break
         return i
 
-    def props(self, i: int, newlines: bool) -> int:
-        """Skip anchors, tags and the explicit-key indicator that may precede a key."""
-        while i < self.n and (
-            self.text[i] in "&!" or (self.text[i] == "?" and self.text[i + 1 : i + 2] in ("", " ", "\t", "\n"))
-        ):
-            while i < self.n and self.text[i] not in " \t\r\n":
-                i += 1
-            i = self.skip(i, newlines)
-        return i
+    def reject_start(self, i: int) -> None:
+        """Reject scalar starts that introduce properties, aliases, directives or explicit keys."""
+        c = self.text[i : i + 1]
+        if c in ("&", "*", "!", "%", "@", "`") or (c == "?" and self.text[i + 1 : i + 2] in ("", " ", "\t", "\n")):
+            raise WorkflowSyntaxError(f"line {self.line_of(i)}: unsupported YAML construct {c!r}")
+
+    def check_key(self, key: str, at: int) -> None:
+        if key == "<<":
+            raise WorkflowSyntaxError(f"line {self.line_of(at)}: merge keys are not supported")
 
     def record(self, key: str, value: str, at: int) -> None:
         if key == "uses":
@@ -169,18 +169,21 @@ class _UsesScanner:
 
     def entry(self, i: int, flow: bool) -> int:
         """Parse `key: value` or a bare item starting at i inside a flow collection."""
-        i = self.props(i, True)
         if i >= self.n:
             raise WorkflowSyntaxError("unterminated flow collection")
+        self.reject_start(i)
         if self.text[i] in "{[":
             return self.flow(i)
         key, j = self.scalar(i, True)
+        self.check_key(key, i)
         k = self.skip(j, True)
         if not self.at_colon(k, True, adjacent=self.text[i] in "'\""):
             if j == i:
                 raise WorkflowSyntaxError(f"line {self.line_of(i)}: unparseable flow entry")
             return j
         k = self.skip(k + 1, True)
+        if k < self.n:
+            self.reject_start(k)
         if k < self.n and self.text[k] in "{[":
             self.record(key, "<collection>", i)
             return self.flow(k)
@@ -189,56 +192,80 @@ class _UsesScanner:
         return end
 
     def run(self) -> list[tuple[int, str]]:
+        if self.text.startswith("\ufeff"):
+            raise WorkflowSyntaxError("byte order mark is not supported")
         i = 0
         skip_over = -1  # block-scalar body: skip lines indented deeper than this column
+        seen_content = False
         while i < self.n:
             eol = self.text.find("\n", i)
             eol = self.n if eol < 0 else eol
-            line = self.text[i:eol]
+            line = self.text[i:eol].rstrip("\r")
             stripped = line.strip()
-            indent = len(line) - len(line.lstrip(" \t"))
+            indent = len(line) - len(line.lstrip(" "))
             if skip_over >= 0:
                 if not stripped or indent > skip_over:
                     i = eol + 1
                     continue
                 skip_over = -1
-            if not stripped or stripped.startswith("#") or stripped in ("---", "..."):
+            if not stripped or stripped.startswith("#"):
                 i = eol + 1
                 continue
+            if line.startswith(("---", "...")) and line[3:4] in ("", " ", "\t"):
+                if line.startswith("---") and not seen_content:
+                    seen_content = True
+                    if line[3:].strip() and not line[3:].strip().startswith("#"):
+                        raise WorkflowSyntaxError(f"line {self.line_of(i)}: content after document marker")
+                    i = eol + 1
+                    continue
+                raise WorkflowSyntaxError(f"line {self.line_of(i)}: document markers are not supported")
+            seen_content = True
+            if line[indent : indent + 1] == "\t":
+                raise WorkflowSyntaxError(f"line {self.line_of(i)}: tab indentation is not supported")
             col = i + indent
+            dashed = False
             while self.text[col : col + 1] == "-" and (col + 1 >= eol or self.text[col + 1] in " \t"):
+                dashed = True
                 col = self.skip(col + 1, False)
-            if self.text[col] == "?" and self.text[col + 1 : col + 2] in ("", " ", "\t", "\n"):
-                raise WorkflowSyntaxError(f"line {self.line_of(col)}: block explicit keys are not supported")
-            col = self.props(col, False)
             if col >= eol:
                 i = eol + 1
                 continue
+            self.reject_start(col)
             end = eol
             if self.text[col] in "{[":
+                if not dashed:
+                    raise WorkflowSyntaxError(f"line {self.line_of(col)}: flow collection outside a sequence item or mapping value")
                 end = self.flow(col)
             else:
                 key, j = self.scalar(col, False)
+                self.check_key(key, col)
                 j = self.skip(j, False)
                 if self.at_colon(j, False, adjacent=self.text[col] in "'\""):
                     v = self.skip(j + 1, False)
                     if v >= eol:
                         self.record(key, "", col)
-                    elif self.text[v] in "|>":
-                        skip_over = col - i
-                        self.record(key, "", col)
-                    elif self.text[v] in "{[":
-                        self.record(key, "<collection>", col)
-                        end = self.flow(v)
                     else:
-                        value, end = self.scalar(v, False)
-                        self.record(key, value, col)
+                        self.reject_start(v)
+                        if self.text[v] in "|>":
+                            skip_over = col - i
+                            self.record(key, "", col)
+                        elif self.text[v] in "{[":
+                            self.record(key, "<collection>", col)
+                            end = self.flow(v)
+                        else:
+                            value, end = self.scalar(v, False)
+                            self.record(key, value, col)
             nl = self.text.find("\n", end)
             i = self.n if nl < 0 else nl + 1
         return self.found
 
 
 def validate_workflow_pins(directory: Path) -> list[str]:
+    # Accepted YAML subset (anything else is rejected, never skipped): block mappings and sequences,
+    # plain and quoted scalars, block scalars (| and >), and flow mappings/sequences that carry no
+    # properties. Rejected with a validation error: BOM, anchors (&), aliases (*), tags (!), merge
+    # keys (<<), explicit keys (?), directives (%), root-level or free-standing flow collections,
+    # tab indentation, document markers other than one leading "---", and unparseable input.
     """Require every mapping key named `uses` (jobs.*.uses and steps[].uses, any YAML form) to be immutable.
 
     A ref must be a full commit SHA or image digest, or a local `./` path. Values of other keys are never

@@ -123,6 +123,46 @@ class WorkflowPinTest(unittest.TestCase):
             with self.subTest(line=line):
                 self.assertTrue(check(line))
 
+    def test_unsupported_constructs_are_rejected_not_skipped(self) -> None:
+        pinned = f"actions/checkout@{SHA}"
+        cases = {
+            "bom": "\ufeffjobs: {}\n",
+            "bom with root flow": "\ufeff{jobs: {j: {steps: [{uses: actions/checkout@v4}]}}}\n",
+            "anchor on flow value": "steps: &steps [{uses: actions/checkout@v4}]\n",
+            "anchor in merge": "- <<: &base {uses: actions/checkout@v4}\n",
+            "anchor on scalar": f"- uses: &a {pinned}\n",
+            "alias": "a: *base\n",
+            "alias item": "- *base\n",
+            "tag": f"- uses: !!str {pinned}\n",
+            "tag on key": f"- !!str uses: {pinned}\n",
+            "merge key": "- <<: {uses: actions/checkout@v4}\n",
+            "merge key alias": "- <<: *base\n",
+            "explicit key": "- ? uses\n  : actions/checkout@v4\n",
+            "explicit key in flow": "- {? uses : actions/checkout@v4}\n",
+            "root flow mapping": "{jobs: {j: {steps: [{uses: actions/checkout@v4}]}}}\n",
+            "root flow sequence": "[{uses: actions/checkout@v4}]\n",
+            "free-standing flow": "steps:\n  [{uses: actions/checkout@v4}]\n",
+            "directive": "%YAML 1.2\n---\na: 1\n",
+            "second document marker": "a: 1\n---\nb: 2\n",
+            "document end marker": "a: 1\n...\n",
+            "content after marker": "--- {uses: actions/checkout@v4}\n",
+            "tab indent": "a:\n\t- uses: " + pinned + "\n",
+            "unterminated quote": 'a: "oops\n',
+            "unterminated flow": "a: {uses: " + pinned + "\n",
+        }
+        for name, text in cases.items():
+            with self.subTest(case=name):
+                with tempfile.TemporaryDirectory() as temporary:
+                    (Path(temporary) / "w.yml").write_text(text, encoding="utf-8")
+                    reasons = validate_workflow_pins(Path(temporary))
+                self.assertEqual(len(reasons), 1, reasons)
+                self.assertIn("cannot scan workflow", reasons[0])
+
+    def test_single_leading_document_marker_is_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            (Path(temporary) / "w.yml").write_text(f"---\nsteps:\n  - uses: actions/checkout@{SHA}\n", encoding="utf-8")
+            self.assertEqual(validate_workflow_pins(Path(temporary)), [])
+
     def test_comment_mentions_are_ignored(self) -> None:
         self.assertEqual(check("# uses: actions/checkout@v4", f"- uses: a/b@{SHA} # uses: x@v1"), [])
 
