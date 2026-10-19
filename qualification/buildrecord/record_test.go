@@ -14,13 +14,14 @@ func syntheticDigest(label string) Digest {
 // Expectations are constructed directly from public synthetic values; no
 // production key builder or validation helper supplies the expected rows.
 func syntheticRecord() Record {
-	inputs := Inputs{syntheticDigest("source"), syntheticDigest("dependencies"), syntheticDigest("toolchain"), syntheticDigest("generator-inputs")}
+	inputs := Inputs{UpstreamRelease: "v0.8.0", Source: syntheticDigest("source"), Dependencies: syntheticDigest("dependencies"), Toolchain: syntheticDigest("toolchain"), GeneratorInputs: syntheticDigest("generator-inputs")}
 	command := func(name string) Command {
 		return Command{CWD: "fixture", Args: []string{"synthetic-action", name}, Environment: map[string]string{"SYNTHETIC_MODE": "offline"}, TestIDs: []string{"case-a", "case-b"}, Fixtures: []Digest{syntheticDigest("fixture")}, Repeats: 2, TimeoutSeconds: 10}
 	}
 	r := Record{Scope: Scope{Inputs: inputs, Ledger: command("ledger"), Producer: "producer-role-a", Verifier: "verifier-role-b"}}
-	for _, name := range []string{"target-a", "target-b"} {
-		target := Target{OS: "synthetic-os", Architecture: name, ABI: "synthetic-abi", CGO: "off", Compiler: "synthetic-compiler", Linker: "synthetic-linker", Tags: []string{"tag-a"}, Features: []string{"feature-a"}}
+	for n, arch := range []string{"amd64", "arm64"} {
+		name := []string{"target-a", "target-b"}[n]
+		target := Target{OS: "linux", Architecture: arch, ABI: "synthetic-abi", CGO: "off", Compiler: "synthetic-compiler", Linker: "synthetic-linker", Tags: []string{"tag-a"}, Features: []string{"feature-a"}}
 		r.Scope.Targets = append(r.Scope.Targets, TargetPlan{name, target, command("build"), command("test"), command("generate")})
 	}
 	for _, role := range []Role{Producer, Verifier} {
@@ -83,6 +84,7 @@ type identityChange struct {
 
 func identityChanges() []identityChange {
 	return []identityChange{
+		{"upstream-release", "Inputs.UpstreamRelease", func(i *Identity) { i.Inputs.UpstreamRelease = "v0.8.1" }},
 		{"source", "Inputs.Source", func(i *Identity) { i.Inputs.Source = syntheticDigest("other-source") }},
 		{"dependencies", "Inputs.Dependencies", func(i *Identity) { i.Inputs.Dependencies = syntheticDigest("other-dependencies") }},
 		{"toolchain", "Inputs.Toolchain", func(i *Identity) { i.Inputs.Toolchain = syntheticDigest("other-toolchain") }},
@@ -270,5 +272,96 @@ func TestBuildRecordEvidenceLossAndConflict(t *testing.T) {
 	r.Results[resultIndex(r, "B4", "target-a", Producer)].Runs[0].Log = ""
 	if Validate(r).State != Unresolved {
 		t.Fatal("prior completeness survived evidence loss")
+	}
+}
+
+// setSyntheticRelease updates the whole declaration and every result, so invalid
+// release tests cannot pass merely because the fixture has mixed identities.
+func setSyntheticRelease(r *Record, release string) {
+	r.Scope.Inputs.UpstreamRelease = release
+	for n := range r.Results {
+		r.Results[n].Identity.Inputs.UpstreamRelease = release
+	}
+}
+
+func TestBuildRecordReleaseSelection(t *testing.T) {
+	for _, release := range []string{"", "v0.7.9", "v0.0.0", "latest", "v0.8.0+", ">=v0.8.0", "v0.8.x", "0.8.0", "v00.8.0", "v0.08.0", "v0.8.00", "v0.8.0-rc.1", "v0.8.0+metadata", " v0.8.0", "v0.8.0 ", "v0.8", "v0.8.0.1", "v0.-8.0", "v0.8.+1", "v0.8.18446744073709551616"} {
+		t.Run("reject/"+release, func(t *testing.T) {
+			r := syntheticRecord()
+			setSyntheticRelease(&r, release)
+			if a := Validate(r); a.State != Failed {
+				t.Fatalf("invalid release accepted: %+v", a)
+			}
+		})
+	}
+	for _, release := range []string{"v0.8.0", "v0.8.1", "v0.9.0", "v0.11.0", "v1.0.0"} {
+		t.Run("exact/"+release, func(t *testing.T) {
+			r := syntheticRecord()
+			setSyntheticRelease(&r, release)
+			if a := Validate(r); a.State != StructurallyComplete || len(a.Findings) != 0 {
+				t.Fatalf("exact selection is structure only: %+v", a)
+			}
+		})
+	}
+	for _, role := range []Role{Producer, Verifier} {
+		for _, release := range []string{"", "v0.7.9", "v0.8.1"} {
+			t.Run("mixed/"+string(role)+"/"+release, func(t *testing.T) {
+				r := syntheticRecord()
+				for n := range r.Results {
+					if r.Results[n].Key.Role == role {
+						r.Results[n].Identity.Inputs.UpstreamRelease = release
+					}
+				}
+				if a := Validate(r); a.State != Failed {
+					t.Fatalf("mixed role release accepted: %+v", a)
+				}
+			})
+		}
+	}
+}
+
+func TestBuildRecordDeclaredTarget(t *testing.T) {
+	for _, change := range identityChanges() {
+		if len(change.field) < len("Target.") || change.field[:len("Target.")] != "Target." {
+			continue
+		}
+		t.Run("changed/"+change.name, func(t *testing.T) {
+			r := syntheticRecord()
+			id := Identity{Target: r.Scope.Targets[0].Target}
+			change.apply(&id)
+			r.Scope.Targets[0].Target = id.Target
+			if a := Validate(r); a.State != Failed {
+				t.Fatalf("changed declaration reused results: %+v", a)
+			}
+		})
+		t.Run("missing/"+change.name, func(t *testing.T) {
+			r := syntheticRecord()
+			// Clear one field in the declaration and its children independently of
+			// validation helpers; malformed declarations cannot hide behind exact joins.
+			clear := func(target *Target) {
+				reflect.ValueOf(target).Elem().FieldByName(change.field[len("Target."):]).SetZero()
+			}
+			clear(&r.Scope.Targets[0].Target)
+			for n := range r.Results {
+				if r.Results[n].Key.Target == "target-a" {
+					clear(&r.Results[n].Identity.Target)
+				}
+			}
+			if a := Validate(r); a.State != Failed {
+				t.Fatalf("implicit target field accepted: %+v", a)
+			}
+		})
+	}
+}
+
+func TestBuildRecordVersionOnly(t *testing.T) {
+	r := Record{Scope: Scope{Inputs: Inputs{UpstreamRelease: "v0.8.0"}}}
+	if a := Validate(r); a.State != Failed {
+		t.Fatalf("release alone accepted: %+v", a)
+	}
+	r = syntheticRecord()
+	r.Results = nil
+	if a := Validate(r); a.State != Unresolved {
+		t.Fatalf("declared release/targets replaced evidence: %+v", a)
 	}
 }

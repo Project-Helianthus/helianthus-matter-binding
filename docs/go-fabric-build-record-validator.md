@@ -1,6 +1,6 @@
 # Offline build-record structural validation
 
-Issue #29 implements a partial slice of #24 / Project #2. The isolated
+Issues #29 and #33 implement partial slices of #24 / Project #2. The isolated
 [`qualification/buildrecord`](../qualification/buildrecord/record.go) package
 uses only the Go standard library and supplied in-memory records. It is
 scaffolding, not a decision about runtime layout, persistence or registration.
@@ -14,7 +14,7 @@ owns Z19 B1–B8 and the per-target B4–B6 evidence requirements. The
 [inventory completeness contract](target-profile/inventory-completeness.md)
 keep mechanics, source facts, target closure and admission separate. Protocol
 facts require the public native documentation contract first. This package adds
-no protocol facts or go-fabric API, target or test-name assertions.
+no protocol facts, source-derived go-fabric API/test names or platform support claims.
 
 `Validate(Record)` checks a predeclared `Scope` against supplied `Results`.
 The finite scope must contain explicit input manifests, a ledger selection,
@@ -26,8 +26,22 @@ Unknown rows, roles, targets, duplicate records and duplicate target tuples fail
 No target outside this roster is covered. There is no inference of supported
 platforms, nor an API for silently excluding a required child.
 
-Every result joins exactly on source, dependency, toolchain and generator/input
-manifest digests; OS, architecture, ABI, CGO, compiler, linker, tags and features;
+`Inputs.UpstreamRelease` must declare one canonical exact stable release in
+`vMAJOR.MINOR.PATCH` form, with unsigned decimal components (no leading zeros),
+at or above `v0.8.0`. Each component must fit an unsigned 64-bit integer.
+Missing/older releases, ranges, `latest`, wildcards, prereleases and build metadata
+fail the declaration. A later exact release needs a new matching scope and results;
+selection alone supplies no authenticity, build success or platform support.
+The baseline comes from supplied release notes; actual API/source inspection
+remains Unknown. No SDK lock, module or dependency pin changes.
+
+Linux `amd64` and `arm64` are intended qualification targets. Records explicitly
+supply ABI, CGO, compiler/linker, tags/features and toolchain manifest for each
+attempt. They are not supported-platform assertions or automatic target defaults.
+The validator permits other explicitly declared tuples without claiming support.
+
+Every result joins exactly on upstream release, source, dependency, toolchain
+and generator/input manifest digests; OS, architecture, ABI, CGO, compiler, linker, tags and features;
 and relative working directory, arguments, permitted environment, exact test IDs,
 fixture digests, repeat count and timeout. Order is significant for slices;
 environment maps compare by exact keys and values. Optional collections must be
@@ -83,8 +97,10 @@ eeBUS output binding remain unchanged.
 
 ## Synthetic example and tests
 
-The [tests](../qualification/buildrecord/record_test.go) construct two synthetic
-targets, eight ledger parents and six target children per role: 28 results total.
+The [tests](../qualification/buildrecord/record_test.go) construct synthetic
+records selecting `v0.8.0` and declaring Linux `amd64` and `arm64` with synthetic
+ABI/compiler/linker/toolchain evidence, eight ledger parents and six target
+children per role: 28 results total.
 Every child has two runs; each B5 run declares two selected, executed and passed
 tests. All digests are computed from public synthetic strings with
 `sha256.Sum256`; no literal digest fixture identifies real source or content.
@@ -93,18 +109,24 @@ source manifest fails its identity join. Removing a verifier child is unresolved
 changing a B6 output fails; losing a log after completeness reopens the result.
 None of these examples executes go-fabric or grants admission.
 
-`TestBuildRecordIdentity` varies each of the 19 fields independently for B4–B6
+`TestBuildRecordIdentity` varies each of the 20 fields independently for B4–B6
 and both roles. `TestBuildRecordLedgerIdentity` also varies every field for
 all eight parents. Required-row tests omit and duplicate each of the 28 records.
 Outcome, execution and evidence-loss controls use independent explicit expected
 states. A mutation that normalizes one result field to the declared field before
 comparison is the reasoned production mutation caught by each corresponding
-identity case; executed mutation evidence belongs in the change's review record.
+identity case. Release cases cover consistent missing/old/invalid declarations,
+explicit later releases and mismatched producer/verifier selections. Target cases
+change or omit every tuple field independently; required-row tests omit every
+child. Version-only claims cannot substitute for declarations or evidence.
+These controls catch dropping release validation/equality, target equality or
+field completeness, missing-child detection, or returning success solely for
+`v0.8.0`. Executed mutation evidence belongs in the change's review record.
 
 The focused offline check is:
 
 ```sh
-GO111MODULE=off go test ./qualification/buildrecord -run '^TestBuildRecord' -count=1
+GO111MODULE=off go test ./qualification/buildrecord -count=1
 ```
 
 The existing hosted workflow does not discover this isolated Go package; future

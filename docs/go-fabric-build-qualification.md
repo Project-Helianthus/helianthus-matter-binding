@@ -1,6 +1,6 @@
 # Offline go-fabric build qualification evidence
 
-This proposed contract addresses issue #25, a partial slice of #24 / Project #2.
+This proposed contract addresses issues #25 and #33, partial slices of #24 / Project #2.
 It defines the evidence needed to review the chosen native-Go go-fabric direction
 on a later Helianthus branch. It neither selects a new SDK nor completes parent
 steps 1–2. Nothing here is stable before Helianthus 1.0. This is a document review
@@ -23,6 +23,21 @@ untouched. Even a fully passing report below cannot admit a production endpoint.
 The [inventory completeness contract](https://github.com/Project-Helianthus/helianthus-matter-binding/blob/main/docs/target-profile/inventory-completeness.md)
 separately requires source semantics, target closure and accepted mapping evidence.
 Build results supply none of those missing facts by default.
+
+Issue #33 declares `v0.8.0` as the baseline upstream release selection, based
+on the supplied release notes. Later qualification attempts must newly declare
+one exact stable release at or above that baseline (`vMAJOR.MINOR.PATCH`), never
+`latest`, a range, wildcard, prerelease or build-metadata alias. This selection
+changes no SDK lock, module or dependency pin. A release label establishes
+neither authentic source bytes, successful compilation nor target support.
+Actual API/source inspection remains **Unknown**.
+
+Linux `amd64` and Linux `arm64` are intended qualification targets, not supported
+platforms. Each record must declare its own ABI, CGO mode, compiler, linker,
+tags/features and exact toolchain manifest; no host defaults or inferred values
+are supplied. Each declared target still requires both roles' B4–B6 children.
+A changed target tuple or release starts a new assessment with matching evidence;
+no earlier result is inherited. No real go-fabric build is performed by this slice.
 
 No go-fabric source tree or module is available in the reviewed source set.
 Its actual public source origin, APIs, module graph, test names, toolchain needs,
@@ -56,8 +71,9 @@ permitted. Cached acquisition does not establish authentic provenance: a verifie
 must reconcile origin evidence with the retained source contents. Missing origin
 evidence stays missing even when the source compiles.
 
-A result's identity is the tuple `(source manifest, dependency manifest,
-toolchain manifest, generator/input manifest, target tuple, command/selection)`.
+A result's identity is the tuple `(exact upstream release, source manifest,
+dependency manifest, toolchain manifest, generator/input manifest, target tuple,
+command/selection)`.
 The target tuple includes OS, architecture, ABI, CGO mode, compiler/linker and
 build tags/features. Command/selection includes working directory relative to the
 bundle, arguments, permitted environment, test identities, fixture inputs, repeat
@@ -78,7 +94,8 @@ Use exactly these eight required rows, with per-target children for B4–B6.
 Declare a finite nonempty target list and a finite nonempty deterministic test
 selection for each claimed execution target before running. List exclusions and
 why they do not establish coverage. An omitted target is outside the claim, not
-supported. No go-fabric target or test selection has yet been established here.
+supported. The intended Linux targets above have no established qualification
+results; actual source-derived test selection remains Unknown.
 
 | Row | Required producer evidence | Verifier responsibility and pass criterion |
 | --- | --- | --- |
@@ -158,7 +175,8 @@ different synthetic bytes, not upstream source. Do not substitute labels for
 actual retained manifests in a later report.
 
 **Valid bounded report shape:** assume retained synthetic artifacts exist for
-source A, dependency D, toolchain T, generator/input G and command plan C. The
+exact release `v0.8.0`, source A, dependency D, toolchain T, generator/input G
+and command plan C. The
 only declared target is synthetic tuple P: `os=synthetic-os`,
 `arch=synthetic-arch`, `abi=synthetic-abi`, `cgo=off`,
 `compiler=synthetic-compiler`, `linker=synthetic-linker`, `tags=[]`.
@@ -186,6 +204,8 @@ from the assumed valid example; preserve other records and reopen dependents.
 
 | Variant | Required assessment |
 | --- | --- |
+| Release is missing/older than `v0.8.0`, or producer and verifier name different exact releases. | Reject the declaration or identity join; B7/B8 cannot pass. |
+| Target tuple changes, a required target child is missing, or a version label is the only claimed success. | Reopen or fail affected rows; no prior assessment or target support is inherited. |
 | Compile log belongs to source B while report and tests name A. | B4/B7 failed for identity mismatch; B8 failed. |
 | Producer says all rows passed but no verifier replay exists. | Claimed passes remain unverified; B8 unverified. |
 | Test command exits zero with zero selected/executed tests. | B5 unverified, B8 unverified; no test success inferred. |

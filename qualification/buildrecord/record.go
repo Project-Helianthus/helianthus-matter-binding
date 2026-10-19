@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -38,6 +39,8 @@ const (
 type Digest string
 
 type Inputs struct {
+	// UpstreamRelease selects an exact release; it does not authenticate source.
+	UpstreamRelease                                  string
 	Source, Dependencies, Toolchain, GeneratorInputs Digest
 }
 
@@ -132,8 +135,27 @@ func validDigest(d Digest) bool {
 	return err == nil && len(b) == 32 && string(d) == strings.ToLower(string(d))
 }
 
+func validRelease(release string) bool {
+	if !strings.HasPrefix(release, "v") {
+		return false
+	}
+	parts := strings.Split(strings.TrimPrefix(release, "v"), ".")
+	if len(parts) != 3 {
+		return false
+	}
+	var version [3]uint64
+	for n, part := range parts {
+		value, err := strconv.ParseUint(part, 10, 64)
+		if err != nil || strconv.FormatUint(value, 10) != part {
+			return false
+		}
+		version[n] = value
+	}
+	return version[0] > 0 || version[1] >= 8
+}
+
 func validInputs(i Inputs) bool {
-	return validDigest(i.Source) && validDigest(i.Dependencies) && validDigest(i.Toolchain) && validDigest(i.GeneratorInputs)
+	return validRelease(i.UpstreamRelease) && validDigest(i.Source) && validDigest(i.Dependencies) && validDigest(i.Toolchain) && validDigest(i.GeneratorInputs)
 }
 
 func uniqueText(values []string, nonempty bool) bool {
