@@ -2,7 +2,8 @@
 
 This document defines the library-neutral offline harness contract for issue
 #26, a partial contract slice of #24 / Project #2. It specifies evidence a
-future go-fabric adapter must produce; it implements no adapter or harness.
+future go-fabric adapter must produce. The offline commissioning slice below
+and the separate reporting harness implement only synthetic mechanics.
 Nothing here is stable before Helianthus 1.0. Abstract event names below are
 fixture symbols, not upstream Go APIs or a new public interface.
 
@@ -43,9 +44,11 @@ they are not evidence that a moving branch matches the reviewed lock. Links
 were compared with the supplied source documents offline, not fetched.
 
 **Current implementation:** fail-closed evidence evaluation and the documented
-upstream fixture boundary. **Proposal:** all harness events, transitions, limits,
-and scenarios below. **Missing evidence:** library sources, an adapter event
-mapping, executable harness results and resource/lifetime measurements. No
+upstream fixture boundary. **Offline implementation:** the [commissioning scenario model](fabrictest-scenario-adapter.md)
+implements a bounded subset of commissioning and restart transitions for issue
+#34; A33 reporting remains separate. **Proposal:** the broader harness events,
+transitions, limits and scenarios below. **Missing evidence:** library sources,
+a real adapter event mapping and library resource/lifetime measurements. No
 upstream Go API behavior or library readiness is asserted. Proven / Hypothesis /
 Unknown labels apply to individual claims with their support; a passing
 synthetic trace proves only that tested mechanic in that fixture. It cannot
@@ -139,7 +142,9 @@ receipt was ambiguous.
 
 ## Required synthetic scenarios
 
-All rows are proposed checks, not executed results. Each starts with a fresh
+All rows describe required adapter checks, not executed library results. The
+[offline commissioning subset](fabrictest-scenario-adapter.md) exercises only its
+documented logical transitions; it does not complete any full adapter row. Each starts with a fresh
 isolated fixture unless it explicitly continues through stop or restart. Adapter
 evidence must map every abstract callback to the actual library lifetime and
 completion boundary, without guessing unsupported APIs.
@@ -167,7 +172,7 @@ status. A disconnected fake alone cannot qualify the library: show the adapter
 actually invokes and observes the library's allocation, cancellation, callback,
 store and cleanup boundaries. Missing hooks or unbounded teardown are unresolved
 qualification blockers. Preserve failed traces rather than reporting only
-successful schedules. No runtime measurements have been collected here.
+successful schedules. No library runtime measurements have been collected here.
 
 Identity tests must vary each axis independently: node, capability and composition
 in K (catch omitted-key-field aliasing); binding identity and slot in the supplied
