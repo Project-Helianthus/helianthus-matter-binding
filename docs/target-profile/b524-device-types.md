@@ -26,9 +26,10 @@ qualified use. In particular, the catalog's solar `†` annotations mean
 CSV value-matching only, with false-positive risk, not independently confirmed
 solar semantics. Historical FLAGS/RW labels do not establish write behavior.
 
-All ledger directions are **native-to-Matter observation candidates**, abbreviated
-**R**. Configuration and setpoints in R rows are read observations only. There
-are no Matter-to-native operations in this slice. Source family scope is eBUS
+The B01–B16 ledger directions are **native-to-Matter observation candidates**,
+abbreviated **R**. Configuration and setpoints in R rows are read observations
+only. The reverse reconciliation below separately inventories acquisition
+references, operation candidates and absent supported operations. Source family scope is eBUS
 controller and functional-module families, with profile-specific applicability;
 remote-room observations are cross-references to the existing air-conditioning inventory,
 not a new survey of remote device types.
@@ -105,6 +106,74 @@ inherits T0 and its stated closure reference.
 | B15 solar pump/valve: [GG04/RR0002, RR0008, RR000B][solar]; [GG00/RR00B8][system] | R kick-enable setting vs pump-active u8 candidate, runtime u32 hours; diverter u8 unit/codebook Unknown. Retain source group/role; exact driver acquisition absent here. | Hypothesis CSV-only solar meanings; Unknown diverter semantics beyond catalog label/raw observation; Q? | T0 / T-U | Kick-enable is not current status. No actuator target, binary valve position or command acceptance inferred. | Kick-enabled creates running pump state, or a diverter code becomes a qualified open/closed valve. |
 | B16 solar/cylinder settings and commands: [GG04/RR0001, RR0004–0006, RR000C][solar], [GG05/RR0001–0003][cylinders], [GG00/RR000B, RR000D, RR0027, RR0029, RR0080–0081, RR0089–008A][system]; heating cylinder configuration row | R catalogued limits °C/K where explicit, kick/bleed/offset settings with unresolved units retained as such. GG04/RR000C representation Unknown. Reset command labels are inventory only; no write execution. Exact additional acquisition absent here. | Hypothesis annotated meanings; Unknown unresolved codecs/units/effects; Q? | T0 / T-U | Do not reinterpret protection limits as measured temperatures, power-limit names as measured watts, or reset labels as safe operations. General settings remain in canonical inventories/catalog. | A reset/configuration label alone enables an operation or a protection limit replaces a sensor reading. |
 
+## Reverse reconciliation: fabric consumers to native candidates
+
+This partial continuation of [#23][matrix] and [#8][parent] adds the requested
+five family searches. A **reverse search** starts with a fabric-consumed role;
+it is not an implemented fabric-to-B524 adapter. An **acquisition mapping**
+locates native read evidence, an **operation candidate** locates a published
+possible write encoding, and a **supported operation** requires independently
+accepted native capability, constraints, response correlation and effect/readback
+evidence. None of the rows below establishes a supported operation. Receiving a
+fabric sensor value supplies no native injection or setter contract. Protocol
+§4.8 explicitly documents no template or sequence as safe to send: an ACK
+does not prove device state, and separately established safety procedure and
+target qualification remain necessary. This document authorizes no write.
+
+The public [register catalog][native] and [B524 protocol][protocol] are the native
+authority first. Read `L(GG,II,RR)` as exact `OP=0x02, OT=0x00` with the listed
+group, instance and register; `D(GG,II,RR)` as `OP=0x06, OT=0x00`. `Z` is the
+concrete zone instance, `C` the concrete physical circuit, and `M` the concrete
+remote instance. Their identity must be retained, not replaced by a display
+index: characterized zone bounds are `0x00..0x0A`, physical circuits
+`0x00..0x08` (virtual `0x09` excluded), and remote slots `0x01..0x08` for the
+characterized profile only. Other profiles and actual presence remain separate
+evidence gaps. Singleton reads use `II=0x00`; write `II=0xFF` below is a literal
+candidate write selector, never an alias for the read instance.
+
+Every row inherits **T0**, native qualification **Unknown**, and admission
+denied. Proven here means a published catalog/template fact only; candidate
+meaning/effect remains Hypothesis or Unknown as specified. Qualification stays
+transport-agnostic and requires native Go **go-fabric 0.8.0 or later** evidence;
+no upstream source or locked normative target corpus is supplied. This is a
+qualification direction, not proof that the library supports these families,
+not a dependency-pin change, and not a replacement for native qualification.
+
+| Reverse row / family search and canonical references | Acquisition reference: exact selector and role | Operation candidate / existing native boundary | Unresolved target obligations and rejection case |
+| --- | --- | --- | --- |
+| RC01 thermostat / room target: [thermostats](thermostats.md) R06–R08, O01; B04; catalog “Zones”; protocol §4.10 | `L(0x03,Z,0x0022)` manual heating target, f32 °C; `L(0x03,Z,0x0007)` comfort target, codec/°C Hypothesis; `L(0x03,Z,0x0014)` effective computed target, f32 °C. Assignment reads `L(0x03,Z,0x0013/0x001C)` retain sensor-binding/circuit-index roles. | Published candidates: `OP=0x02, OT=0x01, GG=0x03, II=Z, RR=0x0022` for the VRC720 family, versus `RR=0x0007` for the VRC700 family, float32 LE. Hypothesis applicability/encoding; accepted effects Unknown. Protocol orders mode before setpoint but proves neither acceptance nor zone=circuit identity. SemReg zone `set_temperature` vocabulary does not implement either route. | T-H / T0; exact target command/attribute access, heating/cooling roles, bounds, precision, composition and mandatory dependencies. Measured RC03 or effective RR0014 must never enable a setter. Family selectors cannot substitute for each other. |
+| RC02 thermostat / room modes and overrides: thermostats R09–R26, O02–O05; B04–B06; catalog “Zones”, “Open questions”; protocol §§4.9–4.10 | `L(0x03,Z,0x0006)` heating mode; `L(0x03,Z,0x0001)` cooling mode; `L(0x03,Z,0x0002/0x0023/0x0015)` configured/manual/effective cooling targets; `L(0x02,C,0x0006)` cooling configuration. These are distinct reads, not capabilities to write. | Mode candidate `OP=0x02, OT=0x01, GG=0x03, II=Z, RR=0x0006`, u16 LE (candidate codes 0/2); meaning/effect Hypothesis/Unknown. Quick-veto candidates `OP=0x02, OT=0x01, GG=0x03, II=Z, RR=0x0008/0x0026/0x000E` (float32/float32/u8) remain with thermostats O03 and protocol §4.9: family-specific sequence, units and effects unresolved. Holiday/cooling routes lack accepted operation contracts (O04/O05). SemReg system `set_mode` cannot be coerced into a zone operation. | T-H / T0; feature applicability, enum/preset semantics, scheduling, cooling capability, command completion and all mandatory facts. Heating evidence cannot establish cooling; an acknowledgement alone cannot establish effect. |
+| RC03 temperature sensor consumption: thermostats R01/R03/R05; [air conditioning](air-conditioning.md); B02/B03/B06/B09/B11–B13; catalog “Zones”, “Remote Control Thermostats” | Room air `L(0x03,Z,0x000F)` and `D(0x0A,M,0x000F)`, f32 °C, remain assignment-qualified separate sources; remote NaN is unavailable. Other water/outdoor/collector roles stay in their canonical B rows. | No published accepted fabric-sensor injection, measurement setter or calibration operation in these references. Measurement is acquisition evidence only; manual target candidates RC01 have a different role/direction. | T-S / T0; actual sensor device/cluster, placement, ranges, scaling, nullability, reporting and mandatory composition. Equal Celsius values do not alias room air, water and outdoor sensors or create a control path. |
+| RC04 humidity sensor consumption: thermostats R02/R04/R05/O06; AC humidity rows; B03/B06; catalog “Zones”, “Circuits”, “Remote Control Thermostats” | `L(0x03,Z,0x0028)`, `L(0x02,C,0x0022)`, `D(0x0A,M,0x0007)`, f32 relative %. Zone/circuit/remote assignment remains unresolved; remote NaN is unavailable. | No accepted humidity setter, sensor injection or dehumidification operation. Thermal humidity vocabulary proves no native write or safe cooling function. | T-S / T0; sensor identity and alias reconciliation, unavailable representation, reporting and every mandatory feature/attribute. Shared % units establish neither common sensor identity nor humidity control. |
+| RC05 pump consumption: [pumps](pumps.md) P1–P9; B07/B10/B15/B16; catalog “Circuits”, “Solar Circuit”, “Native Domestic Hot Water” | Circuit `L(0x02,C,0x001B)` raw u16 pump status, distinct RR001E state, RR0024 hours and RR0025 starts. Solar `L(0x04,0x00,0x0008/0x000B)` candidate activity/runtime; DHW `L(0x01,0x00,0x0002/0x0006)` and external-DHW `L(0x02,C,0x0018)` retain separate roles. | No accepted pump start/stop/speed operation. Solar `L(0x04,0x00,0x0001/0x0002)` are read catalog reset-command/kick-configuration roles, not established write encodings. Solar meanings Hypothesis (CSV-only); solar instance conflict remains with P5–P8. Direct-boiler pump mapping is explicitly absent (P9), not supplied by circuit data. | T-U / T0; target actuator tuple, status/control distinction, counters, limits and mandatory composition. Raw status, reset labels and enabled kick cannot establish actuator support, running state or accepted reset effect. |
+| RC06 valve / mixer consumption: heating mixer and zone-action rows; B08/B15; catalog “Circuits”, “Zones”, “System” | `L(0x02,C,0x001A)` signed movement %, `L(0x02,C,0x0021)` position %, `L(0x03,Z,0x0012)` u16 valve Boolean label; `L(0x00,0x00,0x00B8)` u8 diverter with Unknown codebook/unit. | Concrete read references exist; accepted position/open/close/movement write mapping is absent. Catalog configuration/FLAGS labels prove no write route. Movement, position and thermal demand remain distinct roles. | T-U / T0; valve versus mixer target, travel/position semantics, commands, failure state and mandatory feature/attribute closure. A percentage cannot select an actuator type; open valve cannot prove heat delivery. |
+| RC07 energy-management activation: AC energy-manager row; catalog “System”; protocol §4.11 | `L(0x00,0x00,0x00B6)` external-energy-management-enabled u8 read; `L(0x00,0x00,0x0048)` energy-manager action/demand state is separate, not quantified demand. | Published write candidate `OP=0x02, OT=0x01, GG=0x00, II=0xFF, RR=0x00B6`, u8 0/1. Encoding/meaning Hypothesis; controller reaction and meaning of 0/1 Unknown. No accepted energy-management native operation or supported effect follows. | T-U / T0; actual energy-management device/cluster/features, command scope, constraints, reporting and all mandatory dependencies. Candidate activation must not imply supported dispatch, power limits, demand percentage or fabric authority. |
+| RC08 energy / thermal storage context: B14/B16; [metering](metering.md), [PV](photovoltaic.md), [storage](storage.md), [EVSE](evse.md); catalog “System”; protocol §4.11 | `L(0x00,0x00,0x003D)` solar total u32 kWh; RR00D2–00D5 f32 period totals with units unresolved. `L(0x00,0x00,0x00A2)` buffer-offset configuration remains distinct from measured energy or power. | Published buffer-offset candidate `OP=0x02, OT=0x01, GG=0x00, II=0xFF, RR=0x00A2`, float32 LE, K candidate; controller reaction Unknown. No accepted energy dispatch, counter-reset or demand-response mapping. Other domains remain in their canonical inventories, not aliases of this B524 context. | T-U / T0; target energy/power interval, flow convention, reset/rollover, offset units/limits and mandatory composition. kWh cannot fill watts; a buffer offset cannot establish an energy-management function. |
+
+### Reverse coverage accounting and carried gaps
+
+RC01–RC08 are **eight review bundles across five requested family searches**
+(thermostat/room control, temperature/humidity sensors, pumps, valves/mixers
+and energy management). They record concrete read references or explicit
+absent mappings, not eight unique facts or eight target types. Repeated selectors point back to
+B01–B16 and the pump/thermostat/domain inventories. Count canonical source
+facts once after alias review; operation directions require separate join keys.
+There are **zero accepted representable joins and zero established supported
+reverse operations in this slice**. The full fact/target denominator is Unknown;
+no percentage of full coverage or completed reverse target sweep is claimed.
+
+Remaining gaps include other thermostat/controller/module profiles, remote
+regulator roles, the unresolved solar instance scope, direct-boiler sources,
+all remaining B524 groups and opcode families, schedules/time programs,
+errors/service state, and all other representable device families. OP00 system
+information, OP01/07 descriptions, OP03/04 programs, OP05 unknown layout and
+OP08–0C event/status candidates require their own native reconciliation;
+OP02/06 group numbers never alias these selectors. The full every-group and
+every-opcode matrix remains required by #23. Missing locked Matter 1.7 device,
+cluster, feature and mandatory-attribute contents and accepted semantic mappings
+block the entire target sweep, even where a native read or candidate write is
+named. Unknown-filled rows cannot close #23, #8 or the inventory checkpoint.
+
 ## Alias reconciliation and remaining sweeps
 
 B01–B12 reference the existing heating/air-conditioning canonical rows rather
@@ -177,3 +246,5 @@ authorized or performed.
 [solar]: https://github.com/Project-Helianthus/helianthus-docs-ebus/blob/main/protocols/vaillant/ebus-vaillant-B524-register-map.md#gg0x04--solar-circuit
 [cylinders]: https://github.com/Project-Helianthus/helianthus-docs-ebus/blob/main/protocols/vaillant/ebus-vaillant-B524-register-map.md#gg0x05--cylinders-multi-instance
 [state]: https://github.com/Project-Helianthus/helianthus-docs-ebus/blob/main/protocols/vaillant/ebus-vaillant-B524-register-map.md#circuit-state-enum
+
+[protocol]: https://github.com/Project-Helianthus/helianthus-docs-ebus/blob/main/protocols/vaillant/ebus-vaillant-B524.md

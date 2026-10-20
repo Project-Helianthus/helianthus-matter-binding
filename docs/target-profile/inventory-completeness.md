@@ -180,6 +180,29 @@ the rosters nor their missing evidence. A released inventory checkpoint would
 mean completeness of the reviewed reconciliation, not that every candidate is
 representable or admitted for production.
 
+## B524 matrix coverage reference
+
+The [B524 device-type matrix](b524-device-types.md) adds a bounded reverse
+reconciliation under #23 / parent #8. Its B01–B16 observation bundles and
+RC01–RC08 reverse bundles reuse the canonical [pump](pumps.md),
+[thermostat](thermostats.md) and domain facts. The reverse slice accounts for
+five family searches: thermostat/room control, temperature/humidity sensors,
+pumps, valves/mixers and energy management. Acquisition references, operation
+candidates and supported operations are separately dispositioned; no supported
+reverse operation or accepted representable join is established by that slice.
+
+Bundle counts are review coverage only. They are not unique source/target totals
+or an exhaustive denominator. Repeated selectors are canonical references, not
+extra facts; a new operation direction requires its own join and effect evidence.
+Absent injection/actuation mappings, remaining groups/opcode families, other
+profiles, solar scope conflicts, native/driver qualification and all locked
+target device/cluster/feature/mandatory-attribute closure remain explicit gaps.
+Every other representable family remains required. Qualification against native
+Go go-fabric 0.8.0 or later stays transport-agnostic and separate from native
+semantics, inventory review, runtime and physical acceptance; no upstream source
+or normative locked target corpus is supplied here. These counts and cross-links
+do not lower the checkpoint threshold above or release either parent.
+
 ## Runtime and lifecycle remain unchanged
 
 The current evaluator denies allocation before trusting caller metadata because
