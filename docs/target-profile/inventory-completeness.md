@@ -33,10 +33,12 @@ partition is Thermal, PV, storage, EVSE, metering and infrastructure; membership
 and coverage still require the sweeps below.
 
 The supplied current sources do not include the locked data-model contents, the
-locked docs-semantic target mapping contents, or the CAN driver source. These
-are explicit completion gaps. Lock metadata identifies expected artifacts; it
-does not replace inspecting their contents. No exhaustive locked feature list,
-CAN capability list, or completed six-domain mapping is claimed here. No other
+locked docs-semantic target mapping contents. These remain explicit completion
+gaps. The [native CAN source sweep](can-driver-coverage.md) now records supplied
+Growatt V1.04, common shared-field and Gree raw/candidate source coverage, with
+qualification and target gaps kept separate. Lock metadata does not replace
+inspecting target contents. No exhaustive locked feature list, full CAN
+capability list, or completed six-domain mapping is claimed here. No other
 domain inventory page is an input or prerequisite to these row rules and cases.
 
 ## Proposed reconciliation record
@@ -119,15 +121,15 @@ runtime result. Identifiers describe synthetic families and facts only.
 | EVSE current: `(EVSE, synthetic-native/charging, ac.current, native-to-Matter observation, Electrical Sensor rev 2 / Electrical Power Measurement rev 3 / ActiveCurrent)` | Assume an evidenced current reading for a synthetic charging family solely for this example. The current baseline identifies `evse.ac.current`; the assumption supplies no other facts. | ActiveCurrent is optional. Missing evidenced Descriptor and Power Topology composition, non-unknown PowerMode, positive NumberOfMeasurementTypes, matching non-empty Accuracy and evidenced nullable ActivePower prevent closure. Record blocked pending evidence; never fill these from a sample or current magnitude. |
 | Shared electrical reading: `(PV, synthetic-native/electrical, service-a.active-power, native-to-Matter observation, candidate power attribute)` and `(metering, synthetic-native/electrical, service-a.active-power, native-to-Matter observation, candidate power attribute)` | Assume both rows cite the same public native fact and service scope. Make the metering row an alias to the canonical fact. If scopes differ, retain two facts instead. | Record two domain rows but one distinct source fact. One identical target candidate is counted once; mapping, locked feature conditions and mandatory closure remain Unknown, so both joins are blocked. No second physical measurement, accepted target or endpoint is inferred. |
 | Thermal modes: `(Thermal, synthetic-native/thermal, service-b.cooling, native-to-Matter observation, unresolved cooling component)` and `(Thermal, synthetic-native/thermal, service-b.heating, native-to-Matter observation, unresolved heating component)` | One synthetic Thermal service is assumed to evidence heating only. Its cooling capability is Unknown; shared service identity does not establish cooling support. | Keep separate rows and confidence claims. Heating still needs its own target mapping and closure; cooling is blocked for absent source evidence as well. Neither a shared service nor a target feature supplies cooling evidence. A future operation would require a separate direction row and native operation contract. |
-| Absent driver source: `(infrastructure, unresolved-native/can-family, unresolved fact, native-to-Matter observation, unresolved target component)` | Register the driver group as awaiting inspection. CAN driver source and its public native fact contract are unavailable here; no capability is invented. | Block the source sweep entry and join. This placeholder is not a counted representable fact, a negative representability proof, or a completed driver assessment. Reconcile its key and any actual domain membership only after the source is inspected. |
+| Absent driver source: `(infrastructure, unresolved-native/synthetic-family, unresolved fact, native-to-Matter observation, unresolved target component)` | Register the driver group as awaiting inspection. Assume driver source and its public native fact contract are unavailable; no capability is invented. | Block the source sweep entry and join. This placeholder is not a counted representable fact, a negative representability proof, or a completed driver assessment. Reconcile its key and any actual domain membership only after the source is inspected. |
 
 The EVSE mandatory list above is supported by the baseline and
 [readiness evaluator](https://github.com/Project-Helianthus/helianthus-matter-binding/blob/main/runtime/production_readiness.py).
 The full locked data-model inspection is still required to establish exhaustive
 closure. The shared-reading and Thermal cases apply proposed identity and
 evidence rules; the metadata registry alone cannot prove their native facts.
-The absent-source case preserves the actual source-availability gap without
-claiming CAN behavior.
+The absent-source case is hypothetical; current bounded CAN source coverage
+is recorded in the [native CAN source sweep](can-driver-coverage.md).
 
 ## Later two-way sweep and inventory checkpoint
 
@@ -174,9 +176,9 @@ Releasing the full-inventory checkpoint requires a reviewable evidence bundle:
   deliberately unsupported target has an evidenced disposition, not a hidden
   reduction of scope. This issue alone cannot close that parent.
 
-The missing locked data-model contents, docs-semantic mapping contents and CAN
-driver source currently prevent that release. This contract supplies neither
-the rosters nor their missing evidence. A released inventory checkpoint would
+The missing locked data-model and docs-semantic mapping contents still prevent
+that release. The [native CAN source sweep](can-driver-coverage.md) supplies a
+bounded source roster, not full target reconciliation or its missing evidence. A released inventory checkpoint would
 mean completeness of the reviewed reconciliation, not that every candidate is
 representable or admitted for production.
 
