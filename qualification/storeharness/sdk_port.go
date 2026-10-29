@@ -108,6 +108,11 @@ func (s *SDKStore) Write(r Request) Outcome {
 	if _, retained := s.expected[r.Key]; retained {
 		return PrecommitFailure
 	}
+	for _, retained := range s.expected {
+		if retained.Association.Binding == r.Association.Binding || retained.Association.Slot == r.Association.Slot {
+			return PrecommitFailure
+		}
+	}
 	if len(s.expected) >= RecordLimit {
 		return PrecommitFailure
 	}

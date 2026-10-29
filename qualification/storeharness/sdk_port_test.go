@@ -459,6 +459,64 @@ func TestAA11WithdrawalRetainsEndpointAndFabric(t *testing.T) {
 	aa11Sentinel(t, p)
 }
 
+func TestAA11WithdrawalReservationsAcrossHarnesses(t *testing.T) {
+	for _, outcome := range []Outcome{Confirmed, Ambiguous} {
+		for _, association := range []string{"binding", "slot", "distinct"} {
+			t.Run(fmt.Sprint(outcome)+"/"+association, func(t *testing.T) {
+				p, scope := aa11Fixture()
+				s, h := aa11Harness(t, p, scope)
+				p.outcome = outcome
+				retained := aa11Begin(t, h, aa11Request(scope, "a"))
+				if !h.Complete(retained) {
+					t.Fatal("retained completion lost")
+				}
+				if err := s.Withdraw(h, retained.Key); err != nil {
+					t.Fatal(err)
+				}
+				h.Stop()
+				next, err := New(s, 200)
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(next.Stop)
+				if _, err := next.Start(); err != nil {
+					t.Fatal(err)
+				}
+				equal(t, next.Accepted(), Snapshot{})
+				equal(t, next.Exposed(), Snapshot{})
+				r := aa11Request(scope, "b")
+				switch association {
+				case "binding":
+					r.Association.Binding = retained.Association.Binding
+				case "slot":
+					r.Association.Slot = retained.Association.Slot
+				}
+				p.outcome = Confirmed
+				c := aa11Begin(t, next, r)
+				wantOutcome, wantWrites := PrecommitFailure, 1
+				wantRecords := map[Key]Request{retained.Key: retained.Request}
+				wantExposure := Snapshot{}
+				if association == "distinct" {
+					wantOutcome, wantWrites = Confirmed, 2
+					wantRecords[c.Key] = c.Request
+					wantExposure[c.Key] = c.Association
+				}
+				if c.Outcome != wantOutcome || p.writes != wantWrites {
+					t.Fatalf("write outcome=%v calls=%d; want outcome=%v calls=%d", c.Outcome, p.writes, wantOutcome, wantWrites)
+				}
+				if !next.Complete(c) {
+					t.Fatal("new completion lost")
+				}
+				equal(t, next.Exposed(), wantExposure)
+				if !reflect.DeepEqual(p.endpoints[scope], wantRecords) || !reflect.DeepEqual(s.expected, wantRecords) {
+					t.Fatal("retained reservations or endpoint records changed")
+				}
+				aa11Sentinel(t, p)
+			})
+		}
+	}
+}
+
 func TestAA11AmbiguousCompletionWithdrawal(t *testing.T) {
 	p, scope := aa11Fixture()
 	sibling := aa11Request(scope, "b")
