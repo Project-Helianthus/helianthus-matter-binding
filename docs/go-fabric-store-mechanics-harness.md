@@ -85,6 +85,14 @@ Explicit reconciliation with both original associations exposes both in the
 mock model. A replacement binding or slot is rejected and the second survives.
 No controller, credential, fabric token or real endpoint number is involved.
 
+The injected `SDKStore` seam also permits mock withdrawal after an ambiguous
+completion. Withdrawal requires the endpoint's pending callback to complete and
+retains its identity, reservation and fabric records. The adapter remembers
+withdrawal for accepted or uncertain identities, so later exact reconciliation
+and restarts of the same harness and adapter do not expose that endpoint.
+This intent is instance-local; it does not establish cross-process recovery or
+authorize any live fabric operation.
+
 ## Validation boundary
 
 Run discovery with `GO111MODULE=off go test ./qualification/storeharness -list .`
