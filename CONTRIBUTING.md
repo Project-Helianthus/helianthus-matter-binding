@@ -20,3 +20,9 @@ Do not add credentials, fabric storage, attestation material, private captures,
 personal device identifiers, network coordinates, or a real-device test result.
 No change authorizes production commissioning, deployment, endpoint allocation,
 or a live Gateway operation.
+
+For go-fabric consumption, local patches and defect tracking, follow the
+[upstream contribution workflow](docs/adoption/upstream-contribution-workflow.md).
+SDK adoption does not authorize an upstream contribution: owner CLA review and
+per-contribution authorization remain pending. Issue #67 supplies process material
+only; do not contact the maintainer or prepare an actual submission in this issue.
