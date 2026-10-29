@@ -8,11 +8,11 @@ Protocol facts remain owned by the public native documentation; SemReg owns the 
 
 **Proven** means directly present in the cited source contract or implementation, not executed hardware evidence. **Hypothesis** marks a proposed correspondence still requiring evidence. **Unknown** marks missing evidence, including target schema not supplied for inspection. These grades are independent of native qualification, semantic representability, target-model verification, and production admission.
 
-The [lock][lock] explicitly records data-model version `1.7`, Electrical Sensor `0x0510` revision 2, Power Topology `0x009C` revision 2, Electrical Power Measurement (EPM) `0x0090` revision 3, and optional `ActiveCurrent` `0x0005`. These are **lock metadata only**, not an inspected full schema. No other numeric target identifiers or revisions are asserted here. The lock references the semantic mapping path `api/v1/targets/matter-1.7-ballot-0.9-v1.json`; its PV coverage was not inspected. The [baseline][baseline] records only `evse.ac.current` as the accepted mapping, not a PV mapping.
+The legacy [lock][lock] still records data-model version `1.7`, Electrical Sensor `0x0510` revision 2, Power Topology `0x009C` revision 2, Electrical Power Measurement (EPM) `0x0090` revision 3, and optional `ActiveCurrent` `0x0005`. These are **lock metadata only**, not an inspected full schema. No other numeric target identifiers or revisions are asserted here. The lock references the semantic mapping path `api/v1/targets/matter-1.7-ballot-0.9-v1.json`; its PV coverage was not inspected. The [baseline][baseline] records only `evse.ac.current` as the accepted mapping, not a PV mapping.
 
 Every matrix row below inherits **A0: Matter production admission denied**: the lock's `accepted_runtime_composition_profile_sha256` is null, and [production readiness][readiness] denies every allocation request before trusting caller composition or build evidence. A successful source publication or SDK sample fixture cannot change A0. There is no currently composed Helianthus PV hardware support established by these sources; physical qualification, conformance, interoperability, certification, production fabric operation and deployment remain unproven.
 
-Every row also inherits **C0: composition evidence missing**. The baseline/runtime require evidenced Descriptor and Power Topology composition and EPM `PowerMode` (non-unknown), positive `NumberOfMeasurementTypes`, nonempty fixed `Accuracy` matching the count, and an evidenced nullable `ActivePower` fact. These are recorded baseline/runtime requirements, not independently verified schema conclusions. A nullable fact requires evidence; absence is not fabricated zero. The full locked corpus must reconcile these requirements, device composition, measurement scope, phase topology, units/scaling/ranges, optionality, feature conditions and accepted PV mapping. Native amperes or watts alone supply none of the missing composition authority.
+Every row also inherits **C0: composition evidence missing**. The baseline/runtime require evidenced Descriptor and Power Topology composition and EPM `PowerMode` (non-unknown), positive `NumberOfMeasurementTypes`, nonempty fixed `Accuracy` matching the count, and an evidenced nullable `ActivePower` fact. These are recorded baseline/runtime requirements, not independently verified schema conclusions. A nullable fact requires evidence; absence is not fabricated zero. The full adopted normative corpus must reconcile these requirements, device composition, measurement scope, phase topology, units/scaling/ranges, optionality, feature conditions and accepted PV mapping. Native amperes or watts alone supply none of the missing composition authority.
 
 **T0** in a target cell means device type/cluster/feature/attribute correspondence is **Unknown**; there is no inferred negative target-support claim. **TC** means the optional `ActiveCurrent` lock metadata is a candidate search lead only; PV suitability, feature requirements, phase representation, scale and numeric encoding remain **Unknown**. **TP** means EPM active-power correspondence is a candidate search lead from the baseline only; attribute ID, features, units and semantic direction remain **Unknown**. Neither TC nor TP is an accepted target mapping. All rows explicitly carry A0 and C0 so source coverage cannot be mistaken for admission.
 
@@ -81,21 +81,53 @@ There is no new executable interface or state transition. Proposed future work i
 | Huawei child inventory lists an inverter, optional attachment fails | No unit identity or telemetry inferred; Unknown is not zero, and optional failure does not negate prior identified state | [huawei][huawei] |
 | Caller supplies successful build and accepted-looking profile | Current Matter allocation remains denied by null reviewed acceptance digest | [readiness][readiness], [lock][lock] |
 
-## Locked-corpus reconciliation still required
+## Matter 1.6.1 target reconciliation
 
-No complete connectedhomeip corpus was available for this inventory, and none was fetched. Later reconciliation must use the exact SDK selected by the lock and verify its recorded blobs; public main links below locate Helianthus evidence but do not replace the lock's object identity. Inspect:
+The adopted SDK is [go-fabric](https://github.com/SukramJ/go-fabric) on
+**Matter 1.6.1**, as recorded in the [baseline](../SDK_BASELINE.md).
+The checked-in lock, validator, mapping reference and hosted job remain legacy
+Matter 1.7 artifacts pending owner-controlled replacement; they have not been
+migrated. Any lock metadata below describes that retained legacy state only.
+The [deferred ledger](../adoption/matter-161-deferred.md) separates Sensor
+Electrical Alarm and Power Topology ElectricalCircuit deferrals from the
+absent DEM PowerRangeAdjustment upstream snapshot gap.
 
-- `data_model/1.7/spec_sha` and `data_model/1.7/spec_tag` to verify corpus provenance.
-- `data_model/1.7/device_types/ElectricalSensor.xml` for device revision, mandatory/conditional clusters and composition; `data_model/1.7/clusters/ElectricalPowerMeasurement.xml` for measurement quantity, direction, units, ranges, nullability, accuracy, features and phase scope.
-- `zzz_generated/app-common/clusters/ElectricalPowerMeasurement/AttributeIds.h` and `examples/all-devices-app/all-devices-common/device/types/electrical-sensor/ElectricalSensor.cpp` for generated identifiers versus sample composition; a sample does not prove Helianthus hardware.
-- Search `data_model/1.7/clusters` for `PowerTopology`, `Descriptor`, `ElectricalEnergyMeasurement`, `ActiveCurrent`, `ActivePower`, `Voltage`, `Frequency`, `PowerMode`, `NumberOfMeasurementTypes`, `Accuracy`, imported/exported energy and feature conditions; then record the exact matched filenames and schema evidence. These searches are outstanding, not assertions that a cluster, attribute or PV device type exists or is unsupported.
-- Reconcile the lock-referenced semantic target JSON with each source field, loss, dimension and falsifier. Its full contents were not supplied for this review; no universal target mapping is created here.
+This table applies to every existing source row and target search on this page.
+**Changed** and **Unchanged** describe only the stated identity comparison;
+**Unknown** retains uninspected differences. Reported source presence is Proven
+only within the supplied graded inspection result, not independent replay here,
+full normative-corpus inspection, native qualification or an accepted join.
+Source qualification, direction, loss/withholding and incomplete mandatory
+closure remain independent and unchanged. No row is deleted or promoted. In retained row text, locked target rules
+mean unresolved requirements for the future reviewed adopted baseline, never
+authority to publish against the legacy 1.7 model.
 
-Remaining parent acceptance includes the full target inventory, accepted public semantic mappings, mandatory-fact and build evidence, a reviewed composition/admission decision, independent review and applicable committed-head checks. Hardware/live-fabric acceptance remains separate operator-directed work. Readability and offline source/link review do not validate runtime behavior or release M42/M43.
+| Existing target references and row coverage | Adopted disposition and remaining evidence |
+| --- | --- |
+| Electrical Sensor / Power Topology / EPM; ActiveCurrent, ActivePower, Voltage, Frequency | Changed Sensor/Topology to revision 1; unchanged EPM revision 3. Units, phase/total scope, sign, optional features and accuracy closure Unknown. |
+| ElectricalEnergyMeasurement; imported/exported and lifetime energy | Unknown prior identity → EEM revision 2 source presence; counter continuity, reset, direction and accepted PV join Unknown. |
+| Descriptor, status and temperature; SunSpec/Fronius, Growatt, Huawei source families | Unknown target correspondence outside reported source identities. Retain source-side publication and unavailable monitoring rows without expanding native claims. |
+
+For each candidate, obtain the retained Matter 1.6.1 normative device/cluster
+corpus and inspect the adopted SDK definitions, referenced features, attributes,
+commands, events, access, units, ranges, nullability and transitive mandatory
+composition. Public [upstream source](https://github.com/SukramJ/go-fabric/tree/main)
+locates the implementation; it does not supply the missing retained model corpus.
+Reconcile generated behavior and accepted public semantic target evidence with
+each native fact, direction, loss and falsifier. Do not substitute legacy
+connectedhomeip samples or the sole EVSE current mapping for another family.
+Actual lock migration and matching build/reporting evidence remain owner work.
+
+Descriptor and Power Topology composition, PowerMode, NumberOfMeasurementTypes,
+non-empty matching Accuracy and evidenced nullable ActivePower remain unresolved
+for the electrical route. No full normative corpus, Linux arm64 build, accepted
+production profile, conformance, certification or interoperability is established.
+Production admission remains denied. Native evidence and partial last-known-good
+state, eBUS MCP compatibility and GraphQL parity remain unchanged.
 
 ## Public evidence locators
 
-All file links use public `blob/main` destinations. Line ranges locate the inspected source statements; main may move, so later acceptance must reconcile the reviewed sources with the locked corpus.
+All file links use public `blob/main` destinations. Line ranges locate the inspected source statements; main may move, so later acceptance must reconcile the reviewed sources with the adopted normative corpus.
 
 [lock]: https://github.com/Project-Helianthus/helianthus-matter-binding/blob/main/sdk/matter-sdk.lock.json#L1-L38
 [baseline]: https://github.com/Project-Helianthus/helianthus-matter-binding/blob/main/docs/SDK_BASELINE.md#L69-L93

@@ -16,6 +16,51 @@ target mappings remain with the public semantic documentation owner identified
 by the reviewed lock. This page is binding-local reconciliation, not an accepted
 target mapping or a native decoding contract.
 
+
+## Matter 1.6.1 target reconciliation
+
+The adopted SDK is [go-fabric](https://github.com/SukramJ/go-fabric) on
+**Matter 1.6.1**, as recorded in the [baseline](../SDK_BASELINE.md).
+The checked-in lock, validator, mapping reference and hosted job remain legacy
+Matter 1.7 artifacts pending owner-controlled replacement; they have not been
+migrated. Any lock metadata below describes that retained legacy state only.
+The [deferred ledger](../adoption/matter-161-deferred.md) separates Sensor
+Electrical Alarm and Power Topology ElectricalCircuit deferrals from the
+absent DEM PowerRangeAdjustment upstream snapshot gap.
+
+This table applies to every existing source row and target search on this page.
+**Changed** and **Unchanged** describe only the stated identity comparison;
+**Unknown** retains uninspected differences. Reported source presence is Proven
+only within the supplied graded inspection result, not independent replay here,
+full normative-corpus inspection, native qualification or an accepted join.
+Source qualification, direction, loss/withholding and incomplete mandatory
+closure remain independent and unchanged. No row is deleted or promoted. In retained row text, locked target rules
+mean unresolved requirements for the future reviewed adopted baseline, never
+authority to publish against the legacy 1.7 model.
+
+| Existing target references and row coverage | Adopted disposition and remaining evidence |
+| --- | --- |
+| T-S; B01–B16 and RC03/RC04 sensor/measurement/context joins | Unknown temperature/humidity device and cluster identities/features; retain all bundles and role/alias conflicts. |
+| T-H; RC01/RC02 thermostat, SystemMode, RunningState and Demand | Unknown prior identity → Thermostat revision 11 source presence; command, heating/cooling and preset closure Unknown. |
+| T-U; RC05/RC06 pumps, valves/mixers; RC07/RC08 energy management/storage and water/configuration/counters | Unknown joins and actuator targets; DEM revision 4 / EEM revision 2 source presence supplies neither activation effects nor energy semantics. No reverse operation accepted. |
+
+For each candidate, obtain the retained Matter 1.6.1 normative device/cluster
+corpus and inspect the adopted SDK definitions, referenced features, attributes,
+commands, events, access, units, ranges, nullability and transitive mandatory
+composition. Public [upstream source](https://github.com/SukramJ/go-fabric/tree/main)
+locates the implementation; it does not supply the missing retained model corpus.
+Reconcile generated behavior and accepted public semantic target evidence with
+each native fact, direction, loss and falsifier. Do not substitute legacy
+connectedhomeip samples or the sole EVSE current mapping for another family.
+Actual lock migration and matching build/reporting evidence remain owner work.
+
+Descriptor and Power Topology composition, PowerMode, NumberOfMeasurementTypes,
+non-empty matching Accuracy and evidenced nullable ActivePower remain unresolved
+for the electrical route. No full normative corpus, Linux arm64 build, accepted
+production profile, conformance, certification or interoperability is established.
+Production admission remains denied. Native evidence and partial last-known-good
+state, eBUS MCP compatibility and GraphQL parity remain unchanged.
+
 ## Evidence, identity and bounded coverage
 
 **Proven** describes only what the supplied public source establishes.
@@ -52,8 +97,8 @@ An unresolved profile or target is a gap slot, never a match between unknowns.
 
 ## Target evidence and closure ledger
 
-**T0** applies to every source row: the locked Matter 1.7 data-model contents and
-the locked public semantic target-mapping contents were not supplied. Device
+**T0** applies to every source row: the adopted complete Matter 1.6.1 normative model contents and
+compatible accepted public semantic target evidence were not supplied. Device
 type, cluster, revision, feature selection, attributes, commands, events, types,
 scaling, nullability and mandatory closure are **Unknown** for these joins.
 All rows are **blocked pending evidence**, with zero representable joins and no
@@ -62,7 +107,7 @@ target identifiers are inferred from memory or from native register numbers.
 
 The following labels are search candidates already requested by the canonical
 inventories, not verified schema elements. No additional pump, valve, solar or
-water-heater type is asserted without the locked corpus.
+water-heater type is asserted without the adopted normative corpus.
 
 | Closure reference | Candidate type / cluster / feature search and supported rationale | Evidence still required for closure |
 | --- | --- | --- |
@@ -71,7 +116,7 @@ water-heater type is asserted without the locked corpus.
 | T-U | Unresolved target slot for topology, water services, configuration, energy/counters and actuators. Native group/type names alone supply no Matter device type, cluster or feature. | T0 plus accepted role-specific semantic evidence before target selection. A counter, boolean, percentage or temperature alone cannot close a physical device type. |
 
 For each eventual target, follow every unconditional and selected-feature
-dependency through the exact locked device/cluster definitions until no
+dependency through the adopted normative device/cluster definitions until no
 requirement is unreviewed. Record condition, applicability, required fact and
 joined source row. Unknown applicability blocks closure; an optional fact does
 not satisfy an unrelated mandatory one, and omission is not an evidenced null.
@@ -134,8 +179,8 @@ candidate write selector, never an alias for the read instance.
 Every row inherits **T0**, native qualification **Unknown**, and admission
 denied. Proven here means a published catalog/template fact only; candidate
 meaning/effect remains Hypothesis or Unknown as specified. Qualification stays
-transport-agnostic and requires native Go **go-fabric 0.8.0 or later** evidence;
-no upstream source or locked normative target corpus is supplied. This is a
+transport-agnostic and requires native Go **go-fabric on the adopted Matter 1.6.1 model** evidence;
+no complete retained normative target corpus or independent qualification is supplied. This is a
 qualification direction, not proof that the library supports these families,
 not a dependency-pin change, and not a replacement for native qualification.
 
@@ -169,7 +214,7 @@ errors/service state, and all other representable device families. OP00 system
 information, OP01/07 descriptions, OP03/04 programs, OP05 unknown layout and
 OP08–0C event/status candidates require their own native reconciliation;
 OP02/06 group numbers never alias these selectors. The full every-group and
-every-opcode matrix remains required by #23. Missing locked Matter 1.7 device,
+every-opcode matrix remains required by #23. Missing adopted Matter 1.6.1 normative device,
 cluster, feature and mandatory-attribute contents and accepted semantic mappings
 block the entire target sweep, even where a native read or candidate write is
 named. Unknown-filled rows cannot close #23, #8 or the inventory checkpoint.
@@ -195,9 +240,9 @@ controller-mediated groups are outside this named roster, not assessed as
 unrepresentable and not removed from the full inventory denominator.
 
 The completeness contract still requires an inspected driver-group sweep,
-locked target-tree sweep, all aliases/conflicts reconciled and mandatory closure
+adopted target-tree sweep, all aliases/conflicts reconciled and mandatory closure
 for each individual join. Reported function names do not replace driver source
-inspection. Missing solar acquisition, role-specific semantic contracts, locked
+inspection. Missing solar acquisition, role-specific semantic contracts, adopted
 target definitions and public mappings remain explicit follow-ups to their
 owning repositories. Populating Unknown cells completes neither sweep nor the
 full-inventory checkpoint. No sibling output is a build dependency here.

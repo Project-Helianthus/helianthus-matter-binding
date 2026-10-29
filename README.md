@@ -11,37 +11,27 @@ bridge. The currently accepted mapping supplies only `evse.ac.current`; it does
 not supply the mandatory Electrical Sensor composition facts. Therefore no
 Helianthus Electrical Sensor endpoint can be enabled by this repository today.
 
-## Exact baseline
+## Adopted baseline and retained legacy tooling
 
-[`sdk/matter-sdk.lock.json`](sdk/matter-sdk.lock.json) records the accepted
-public target:
+Helianthus adopts [go-fabric](https://github.com/SukramJ/go-fabric), an
+Apache-2.0 pure-Go semantic port of matter.js, on its **Matter 1.6.1** data
+model. SDK selection is an owner decision, not qualification or certification.
+The full inventory includes storage, thermal/HVAC, PV, EVSE, metering,
+infrastructure, pumps, thermostats, valves/mixers and bridge composition; it is
+not reduced to an initial Electrical Sensor bridge.
 
-- fork target `AryaHassanli/connectedhomeip` at
-  `29b4768a513cf566011ab8cd60df1bc495204953`;
-- upstream Matter 1.7 merge [project-chip/connectedhomeip#73842](https://github.com/project-chip/connectedhomeip/pull/73842)
-  at `bd73b5141729af92f3d021aeecaa53d9e0cadb89`;
-- semantic mapping revision `30f5e5c79ac6da3a7c7c10c990599906d1dfd0cb`,
-  `api/v1/targets/matter-1.7-ballot-0.9-v1.json`, SHA-256
-  `5ae81d5e0971d25ead08f982fdf31caf47ada4838d0ee6f2b3e719d11a6df39c`.
+The checked-in [SDK lock](sdk/matter-sdk.lock.json), strict validator and
+[hosted job](.github/workflows/sdk-baseline.yml) still describe the legacy
+connectedhomeip fork and Matter 1.7 target. Their replacement is owner-controlled
+work and has **not** happened here. Legacy build/fixture results cannot qualify
+go-fabric. Neither a complete retained normative model corpus, a Linux arm64
+build nor an accepted production profile is supplied by this documentation.
 
-The lock binds Electrical Sensor `0x0510`, Power Topology `0x009C`, Electrical
-Power Measurement `0x0090`, and optional `ActiveCurrent` `0x0005`.
-
-The strict validator checks the reviewed lock shape and, when given an SDK
-checkout, checks detached HEAD and every locked blob. It refuses changed or
-additional lock content.
-
-```bash
-python3 tools/validate_lock.py
-python3 tools/validate_lock.py --sdk-checkout /path/to/connectedhomeip
-python3 -m unittest discover -s tests -v
-```
-
-The hosted job creates the only intended build evidence: a clean recursive Linux
-checkout at the exact SHA, builds the code-driven `all-devices-app` and
-`chip-tool`, builds focused Electrical Power Measurement and Power Topology
-tests, and runs the upstream Electrical Sensor fixture with temporary SDK test
-state. See [the baseline procedure](docs/SDK_BASELINE.md).
+See the [baseline and legacy fixture procedure](docs/SDK_BASELINE.md),
+[full inventory reconciliation](docs/target-profile/inventory-completeness.md)
+and [named deferrals and snapshot gaps](docs/adoption/matter-161-deferred.md).
+Matter 1.7 remains draft direction for later pre-1.0 review; nothing is stable
+before Helianthus 1.0.
 
 ## Fail-closed production admission
 
@@ -51,7 +41,7 @@ this revision. The reviewed lock pins
 denies endpoint allocation, including calls that provide self-asserted
 `accepted` metadata or passed build JSON. A future reviewed change may replace
 that immutable absent state with an exact canonical profile digest, after which
-the unmodified lock, exact-SHA build/fixture result, and matching accepted
+the unmodified lock, matching independently verified SDK build/fixture result, and matching accepted
 profile would all be required. That profile must provide evidenced Descriptor
 and Power Topology composition plus Electrical Power Measurement `PowerMode`,
 `NumberOfMeasurementTypes`, a non-empty `Accuracy` list, and its nullable

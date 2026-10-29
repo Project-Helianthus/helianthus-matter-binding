@@ -30,7 +30,7 @@ Each row keeps four independent axes:
   currently composed hardware support.
 - **T?** in every target cell means device type / cluster / feature / attribute,
   their IDs, revisions, types, scaling, nullability and mandatory composition
-  are **Unknown** for this domain in the locked corpus. Suggested search terms
+  are **Unknown** for this domain in the adopted normative corpus. Suggested search terms
   below are reconciliation work, not target-support claims.
 - **A0** in every admission cell means production allocation is denied. The
   reviewed lock has `accepted_runtime_composition_profile_sha256: null`;
@@ -141,51 +141,49 @@ conflicting or unqualified data. No credential, principal or permission checks
 are introduced; authentication/authorization remain 0.11 subjects, with no new
 authorization gates before 0.9.
 
-## Locked target evidence and remaining reconciliation
+## Matter 1.6.1 target reconciliation
 
-The [lock][lock] explicitly records data-model version `1.7`, Electrical Sensor
-`0x0510` revision 2, Power Topology `0x009C` revision 2, Electrical Power
-Measurement `0x0090` revision 3 and optional ActiveCurrent `0x0005`.
-These are **lock metadata**, not an inspected complete schema and not an
-air-conditioning target assignment. No thermal target IDs or revisions are
-claimed. The [SDK baseline][baseline] describes an Electrical Sensor sample
-fixture; its result cannot supply thermostat or humidity-sensor composition.
-The full locked connectedhomeip data model was unavailable for this inventory.
+The adopted SDK is [go-fabric](https://github.com/SukramJ/go-fabric) on
+**Matter 1.6.1**, as recorded in the [baseline](../SDK_BASELINE.md).
+The checked-in lock, validator, mapping reference and hosted job remain legacy
+Matter 1.7 artifacts pending owner-controlled replacement; they have not been
+migrated. Any lock metadata below describes that retained legacy state only.
+The [deferred ledger](../adoption/matter-161-deferred.md) separates Sensor
+Electrical Alarm and Power Topology ElectricalCircuit deferrals from the
+absent DEM PowerRangeAdjustment upstream snapshot gap.
 
-Later reconciliation must use that exact locked checkout, without substituting
-another SDK or inferring mandatory requirements from names:
+This table applies to every existing source row and target search on this page.
+**Changed** and **Unchanged** describe only the stated identity comparison;
+**Unknown** retains uninspected differences. Reported source presence is Proven
+only within the supplied graded inspection result, not independent replay here,
+full normative-corpus inspection, native qualification or an accepted join.
+Source qualification, direction, loss/withholding and incomplete mandatory
+closure remain independent and unchanged. No row is deleted or promoted. In retained row text, locked target rules
+mean unresolved requirements for the future reviewed adopted baseline, never
+authority to publish against the legacy 1.7 model.
 
-1. Inspect `data_model/1.7/spec_sha`, `data_model/1.7/spec_tag`,
-   `data_model/1.7/device_types/ElectricalSensor.xml` and
-   `data_model/1.7/clusters/ElectricalPowerMeasurement.xml` identified by the lock.
-   These paths are lock evidence, not domain coverage.
-2. Search `data_model/1.7/device_types` for `Thermostat`, `Temperature`,
-   `Humidity`, `AirCondition` and `Room`; search `data_model/1.7/clusters` for
-   `Thermostat`, `TemperatureMeasurement`, `RelativeHumidityMeasurement`,
-   `SystemMode`, `RunningState`, `Cooling` and `Demand`. These are exact search
-   terms and directories for finding candidate files; their existence and
-   applicability remain unverified. Record actual matched file paths before
-   proposing target cells.
-3. For each actual match, inspect mandatory/optional features, attributes,
-   commands, enum values, bounds, units, scaling, nullability and revisions;
-   follow referenced device-composition requirements and descriptor topology.
-   Inspect corresponding generated files under
-   `zzz_generated/app-common/clusters` and server implementations under
-   `src/app/clusters`, then relevant controller tests. No target absence claim
-   follows from the small lock metadata surface.
-4. Obtain the semantic mapping artifact at the path recorded in `mapping.path`
-   in the lock and its source-owner approval; it was not supplied for inspection.
-   Resolve each candidate falsifier and source qualification separately. Extend
-   accepted evidence through the owning repositories before any profile proposal.
+| Existing target references and row coverage | Adopted disposition and remaining evidence |
+| --- | --- |
+| Thermostat; SystemMode, RunningState, Cooling, Demand; mode/setpoint/preset candidates | Unknown old identity → adopted Thermostat revision 11 source presence. Heating/cooling capability, mode loss, demand and separate command closure remain Unknown. |
+| Temperature, Humidity, AirCondition, Room; TemperatureMeasurement and RelativeHumidityMeasurement | Unknown target identities/features; retain zone/circuit/remote measurement and calibration distinctions, NaN and Gree source gaps. |
+| Electrical Sensor / Power Topology / EPM and Descriptor composition | Changed Sensor/Topology to revision 1; unchanged EPM revision 3; no thermal mapping follows from the legacy electrical fixture. |
 
-Cooling energy counters, ventilation control, DHW, boiler behavior, schedules as
-commands and unrelated thermal capabilities do not acquire target mappings here.
-The inspected sources also do not establish a complete current-driver catalog:
-Gree owner discovery and current implementation inspection remain explicit gaps.
-Full target inventory, mandatory composition, locked-corpus verification, matching
-build evidence, independent review and any separately directed hardware acceptance
-remain parent work. This document cannot establish runtime admission, release
-M42/M43 or close #8.
+For each candidate, obtain the retained Matter 1.6.1 normative device/cluster
+corpus and inspect the adopted SDK definitions, referenced features, attributes,
+commands, events, access, units, ranges, nullability and transitive mandatory
+composition. Public [upstream source](https://github.com/SukramJ/go-fabric/tree/main)
+locates the implementation; it does not supply the missing retained model corpus.
+Reconcile generated behavior and accepted public semantic target evidence with
+each native fact, direction, loss and falsifier. Do not substitute legacy
+connectedhomeip samples or the sole EVSE current mapping for another family.
+Actual lock migration and matching build/reporting evidence remain owner work.
+
+Descriptor and Power Topology composition, PowerMode, NumberOfMeasurementTypes,
+non-empty matching Accuracy and evidenced nullable ActivePower remain unresolved
+for the electrical route. No full normative corpus, Linux arm64 build, accepted
+production profile, conformance, certification or interoperability is established.
+Production admission remains denied. Native evidence and partial last-known-good
+state, eBUS MCP compatibility and GraphQL parity remain unchanged.
 
 ## Public evidence locators
 
@@ -213,3 +211,8 @@ claim within these files; line locators reflect the inspected source views.
 [manager]: https://github.com/Project-Helianthus/helianthus-docs-ebus/blob/main/protocols/vaillant/ebus-vaillant-B524-register-map.md#L1384-L1416
 [families]: https://github.com/Project-Helianthus/helianthus-docs-ebus/blob/main/protocols/vaillant/ebus-vaillant-B524-register-map.md#L1444-L1494
 [writes]: https://github.com/Project-Helianthus/helianthus-docs-ebus/blob/main/protocols/vaillant/ebus-vaillant-B524-register-map.md#L1496-L1522
+
+Cooling energy counters, ventilation, DHW, boiler behavior and schedules as
+commands remain independently unresolved. The bounded CAN sweep supplies Gree
+structural source coverage, not HVAC property meaning or acceptance of the
+canonical unavailable rows. Full driver coverage and target closure remain open.

@@ -42,9 +42,9 @@ an unaccepted mapping candidate; **Unknown** marks absent evidence. The status
 without projecting it; “unavailable” means unavailable in these reviewed sources,
 not universally unsupported by Matter or any driver.
 
-## Locked target boundary and shared gaps
+## Adopted target and retained legacy boundary and shared gaps
 
-L explicitly records data-model version `1.7`; Electrical Sensor `0x0510`
+The legacy lock L still records data-model version `1.7`; Electrical Sensor `0x0510`
 revision 2; Power Topology `0x009C` revision 2; Electrical Power Measurement
 (EPM) `0x0090` revision 3; and optional `ActiveCurrent` `0x0005`. These are
 **lock metadata**, not conclusions from inspecting the complete SDK schema.
@@ -70,7 +70,7 @@ remains open. They are not claimed as an independently inspected SDK mandatory
 set. No measurement unit, point count, scale factor, event bit, text dimension,
 or family name may substitute for Accuracy, topology, or measurement-type
 metadata. Exact required range, resolution, error, feature and nullability
-rules remain Unknown pending the locked corpus.
+rules remain Unknown pending the adopted normative corpus.
 
 ## Infrastructure semantic inventory
 
@@ -175,36 +175,46 @@ Public native documentation must establish protocol facts before semantic or
 target mapping acceptance; this inventory neither writes that contract nor
 substitutes source labels for it.
 
-## Locked-corpus reconciliation still required
+## Matter 1.6.1 target reconciliation
 
-Obtain the exact locked SDK corpus through the existing controlled reproduction
-process, outside this offline inventory. Do not reconcile against another SDK or
-an unpinned current tree. Required inspections/searches are:
+The adopted SDK is [go-fabric](https://github.com/SukramJ/go-fabric) on
+**Matter 1.6.1**, as recorded in the [baseline](../SDK_BASELINE.md).
+The checked-in lock, validator, mapping reference and hosted job remain legacy
+Matter 1.7 artifacts pending owner-controlled replacement; they have not been
+migrated. Any lock metadata below describes that retained legacy state only.
+The [deferred ledger](../adoption/matter-161-deferred.md) separates Sensor
+Electrical Alarm and Power Topology ElectricalCircuit deferrals from the
+absent DEM PowerRangeAdjustment upstream snapshot gap.
 
-1. `data_model/1.7/spec_sha`, `data_model/1.7/spec_tag` and
-   `data_model/1.7/device_types/ElectricalSensor.xml`: verify corpus identity,
-   device revision, required clusters and conformance expressions.
-2. `data_model/1.7/clusters/ElectricalPowerMeasurement.xml` and
-   `zzz_generated/app-common/clusters/ElectricalPowerMeasurement/AttributeIds.h`:
-   search `PowerMode`, `NumberOfMeasurementTypes`, `Accuracy`, `ActivePower`,
-   `ActiveCurrent`, feature/conformance declarations, measurement types, units,
-   ranges, nullability, scaling and generated attribute identifiers.
-3. Search `data_model/1.7/clusters` for `PowerTopology`, `Descriptor` and energy
-   measurement declarations; resolve actual filenames and transitive types
-   from that corpus before asserting attributes, revisions or mandatory facts.
-   Search for voltage, frequency, apparent/reactive power, power factor,
-   imported/exported energy, phase and line-pair representation; absence from
-   supplied views is not a negative target-support finding.
-4. `examples/all-devices-app/all-devices-common/device/types/electrical-sensor/ElectricalSensor.cpp`:
-   inspect sample composition separately from schema requirements and hardware.
-5. Resolve L's `mapping.path` in its declared semantic owner and reconcile the
-   accepted mapping with this inventory. B reports only `evse.ac.current` in the
-   accepted mapping; that is not an infrastructure-wide mapping or source
-   qualification, and the mapping file itself was not supplied for review.
+This table applies to every existing source row and target search on this page.
+**Changed** and **Unchanged** describe only the stated identity comparison;
+**Unknown** retains uninspected differences. Reported source presence is Proven
+only within the supplied graded inspection result, not independent replay here,
+full normative-corpus inspection, native qualification or an accepted join.
+Source qualification, direction, loss/withholding and incomplete mandatory
+closure remain independent and unchanged. No row is deleted or promoted. In retained row text, locked target rules
+mean unresolved requirements for the future reviewed adopted baseline, never
+authority to publish against the legacy 1.7 model.
 
-Parent acceptance remains open for full target inventory, native contracts,
-producer identity and publication evidence, semantic mapping acceptance,
-composition metadata, exact locked-schema/build evidence, independent review,
-and any separately authorized hardware acceptance. Readability and offline
-public-locator checks provide documentation evidence only. They cannot establish
-transport behavior, passive capture evidence, production admission or release.
+| Existing target references and row coverage | Adopted disposition and remaining evidence |
+| --- | --- |
+| Electrical Sensor / Power Topology / EPM / ActiveCurrent; voltage, frequency, power factor, apparent/reactive/active power | Changed Sensor/Topology to revision 1; unchanged EPM revision 3. Quantity, sign, phase/line-pair, range, scaling and optional-field closure Unknown. |
+| Energy measurement, imported/exported and accumulation counters | Unknown prior identity → EEM revision 2 source presence. Native SunSpec points and eeBUS raw values retain independent scope/reset/qualification gaps. |
+| Descriptor, physical topology, circuit/site/status and service grouping | Unknown target correspondence and topology proof; semantic dimensions do not allocate endpoints or supply hardware facts. |
+
+For each candidate, obtain the retained Matter 1.6.1 normative device/cluster
+corpus and inspect the adopted SDK definitions, referenced features, attributes,
+commands, events, access, units, ranges, nullability and transitive mandatory
+composition. Public [upstream source](https://github.com/SukramJ/go-fabric/tree/main)
+locates the implementation; it does not supply the missing retained model corpus.
+Reconcile generated behavior and accepted public semantic target evidence with
+each native fact, direction, loss and falsifier. Do not substitute legacy
+connectedhomeip samples or the sole EVSE current mapping for another family.
+Actual lock migration and matching build/reporting evidence remain owner work.
+
+Descriptor and Power Topology composition, PowerMode, NumberOfMeasurementTypes,
+non-empty matching Accuracy and evidenced nullable ActivePower remain unresolved
+for the electrical route. No full normative corpus, Linux arm64 build, accepted
+production profile, conformance, certification or interoperability is established.
+Production admission remains denied. Native evidence and partial last-known-good
+state, eBUS MCP compatibility and GraphQL parity remain unchanged.
