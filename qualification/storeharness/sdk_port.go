@@ -154,8 +154,9 @@ func (s *SDKStore) Reconcile(h *Harness) error {
 }
 
 // Withdraw stops mock exposure only. It retains endpoint identity, reservations
-// and all fabrics. Pending writes must complete first, so a late completion
-// cannot undo withdrawal. Future selection intent remains a separate owner.
+// and all fabrics, including unresolved identities after ambiguous completion.
+// Pending writes must complete first, so a late completion cannot undo
+// withdrawal. Future selection intent remains a separate owner.
 func (s *SDKStore) Withdraw(h *Harness, k Key) error {
 	if h == nil || h.store != s || k.Node != s.scope.Node {
 		return fmt.Errorf("withdrawal namespace mismatch")
@@ -164,7 +165,9 @@ func (s *SDKStore) Withdraw(h *Harness, k Key) error {
 		return fmt.Errorf("withdrawal awaits completion")
 	}
 	if _, accepted := h.accepted[k]; !accepted {
-		return fmt.Errorf("unknown retained endpoint")
+		if _, uncertain := h.uncertain[k]; !uncertain {
+			return fmt.Errorf("unknown retained endpoint")
+		}
 	}
 	s.withdrawn[k] = true
 	delete(h.exposed, k)

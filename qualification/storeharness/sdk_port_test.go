@@ -459,6 +459,51 @@ func TestAA11WithdrawalRetainsEndpointAndFabric(t *testing.T) {
 	aa11Sentinel(t, p)
 }
 
+func TestAA11AmbiguousCompletionWithdrawal(t *testing.T) {
+	p, scope := aa11Fixture()
+	sibling := aa11Request(scope, "b")
+	p.endpoints[scope][sibling.Key] = sibling
+	fabric := FabricScope{scope, "fabric-a"}
+	p.fabrics[fabric] = "opaque"
+	s, h := aa11Harness(t, p, scope)
+	p.outcome = Ambiguous
+	c := aa11Begin(t, h, aa11Request(scope, "a"))
+	if err := s.Withdraw(h, c.Key); err == nil {
+		t.Fatal("pending withdrawal permitted")
+	}
+	if !h.Complete(c) {
+		t.Fatal("completion lost")
+	}
+	equal(t, h.Accepted(), Snapshot{sibling.Key: sibling.Association})
+	if err := s.Withdraw(h, c.Key); err != nil {
+		t.Fatal(err)
+	}
+	for _, reconcile := range []bool{false, true} {
+		if reconcile {
+			if err := s.Reconcile(h); err != nil {
+				t.Fatal(err)
+			}
+			equal(t, h.Exposed(), Snapshot{sibling.Key: sibling.Association})
+		}
+		h.Stop()
+		if _, err := h.Start(); err != nil {
+			t.Fatal(err)
+		}
+		equal(t, h.Exposed(), Snapshot{sibling.Key: sibling.Association})
+		if _, err := h.Begin(c.Key, c.Association); err == nil {
+			t.Fatal("withdrawn identity allowed retry")
+		}
+		other := aa11Request(scope, "c")
+		if _, err := h.Begin(other.Key, other.Association); err == nil {
+			t.Fatal("withdrawal released reservation")
+		}
+	}
+	if p.writes != 1 || !reflect.DeepEqual(p.endpoints[scope], map[Key]Request{c.Key: c.Request, sibling.Key: sibling}) || p.fabrics[fabric] != "opaque" || p.removals != 0 || p.resets != 0 {
+		t.Fatal("withdrawal changed retained storage")
+	}
+	aa11Sentinel(t, p)
+}
+
 func TestAA11RestoredRecordIdentityFence(t *testing.T) {
 	for _, field := range []string{"generation", "token"} {
 		t.Run(field, func(t *testing.T) {
