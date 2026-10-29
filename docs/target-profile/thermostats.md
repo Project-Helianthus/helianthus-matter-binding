@@ -7,6 +7,50 @@ under Project #2. It separates thermostat-related observations and candidate
 operations; it does not choose a minimal endpoint or complete either parent.
 Nothing here is stable before Helianthus 1.0.
 
+
+## Matter 1.6.1 target reconciliation
+
+The adopted SDK is [go-fabric](https://github.com/SukramJ/go-fabric) on
+**Matter 1.6.1**, as recorded in the [baseline](../SDK_BASELINE.md).
+The checked-in lock, validator, mapping reference and hosted job remain legacy
+Matter 1.7 artifacts pending owner-controlled replacement; they have not been
+migrated. Any lock metadata below describes that retained legacy state only.
+The [deferred ledger](../adoption/matter-161-deferred.md) separates Sensor
+Electrical Alarm and Power Topology ElectricalCircuit deferrals from the
+absent DEM PowerRangeAdjustment upstream snapshot gap.
+
+This table applies to every existing source row and target search on this page.
+**Changed** and **Unchanged** describe only the stated identity comparison;
+**Unknown** retains uninspected differences. Reported source presence is Proven
+only within the supplied graded inspection result, not independent replay here,
+full normative-corpus inspection, native qualification or an accepted join.
+Source qualification, direction, loss/withholding and incomplete mandatory
+closure remain independent and unchanged. No row is deleted or promoted. In retained row text, locked target rules
+mean unresolved requirements for the future reviewed adopted baseline, never
+authority to publish against the legacy 1.7 model.
+
+| Existing target references and row coverage | Adopted disposition and remaining evidence |
+| --- | --- |
+| R01–R05 room/remote temperature, humidity and sensor association | Unknown sensor target identities and features; source evidence unchanged, unavailable remote values never become zero or fresh. |
+| R06–R26 manual/effective/setback/cooling/holiday/override, mode/action and capability roles; O01–O06 operations | Unknown prior identity → Thermostat revision 11 source presence. Exact features, bounds, loss, native write effect and mandatory closure remain Unknown; observations and operations stay separate. |
+
+For each candidate, obtain the retained Matter 1.6.1 normative device/cluster
+corpus and inspect the adopted SDK definitions, referenced features, attributes,
+commands, events, access, units, ranges, nullability and transitive mandatory
+composition. Public [upstream source](https://github.com/SukramJ/go-fabric/tree/main)
+locates the implementation; it does not supply the missing retained model corpus.
+Reconcile generated behavior and accepted public semantic target evidence with
+each native fact, direction, loss and falsifier. Do not substitute legacy
+connectedhomeip samples or the sole EVSE current mapping for another family.
+Actual lock migration and matching build/reporting evidence remain owner work.
+
+Descriptor and Power Topology composition, PowerMode, NumberOfMeasurementTypes,
+non-empty matching Accuracy and evidenced nullable ActivePower remain unresolved
+for the electrical route. No full normative corpus, Linux arm64 build, accepted
+production profile, conformance, certification or interoperability is established.
+Production admission remains denied. Native evidence and partial last-known-good
+state, eBUS MCP compatibility and GraphQL parity remain unchanged.
+
 ## Scope and evidence
 
 The inspected public native contract is the B524 register catalog [N], followed
@@ -36,11 +80,11 @@ semantics. Read rows inventory observations, never permission to operate.
 **T?** in every row means blocked pending target evidence: candidate target role
 only; device type/revision, cluster/revision, feature, attribute/command/event,
 mandatory dependencies, units/precision/nullability and accepted public semantic
-target mapping are Unknown. The reviewed lock selects Matter 1.7, but its full
-locked target corpus and target mapping contents were not supplied [C]. No
+target mapping are Unknown. The retained legacy lock selects Matter 1.7; the adopted complete Matter
+1.6.1 normative corpus and compatible target mapping remain missing [C]. No
 normative thermostat identifiers, required feature list or representability
 claim can be derived from similarly named source fields. Every T? needs that
-locked-corpus inspection and complete mandatory-feature closure. Unknown-filled
+adopted-corpus inspection and complete mandatory-feature closure. Unknown-filled
 rows record gaps and never establish completeness or a target exclusion.
 
 ## Ledger identity and direction
@@ -163,7 +207,7 @@ semantic mappings and mandatory closure still govern parent acceptance.
 
 Public main links locate the reviewed supplied views; they are not immutable
 qualification evidence. Offline review checks repository/path and cited content,
-not network reachability or current main freshness. Missing locked target
+not network reachability or current main freshness. Missing adopted target
 contents cannot be replaced with current upstream material or SDK fixtures.
 
 No SDK selection, accepted profile, allocation, runtime interface, live test or

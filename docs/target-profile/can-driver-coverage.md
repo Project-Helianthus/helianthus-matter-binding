@@ -7,6 +7,51 @@ repeating the [pump](pumps.md), [thermostat](thermostats.md) or
 1.0. No row releases M42/M43, establishes inventory completeness, qualifies an
 installation, or permits an endpoint.
 
+
+## Matter 1.6.1 target reconciliation
+
+The adopted SDK is [go-fabric](https://github.com/SukramJ/go-fabric) on
+**Matter 1.6.1**, as recorded in the [baseline](../SDK_BASELINE.md).
+The checked-in lock, validator, mapping reference and hosted job remain legacy
+Matter 1.7 artifacts pending owner-controlled replacement; they have not been
+migrated. Any lock metadata below describes that retained legacy state only.
+The [deferred ledger](../adoption/matter-161-deferred.md) separates Sensor
+Electrical Alarm and Power Topology ElectricalCircuit deferrals from the
+absent DEM PowerRangeAdjustment upstream snapshot gap.
+
+This table applies to every existing source row and target search on this page.
+**Changed** and **Unchanged** describe only the stated identity comparison;
+**Unknown** retains uninspected differences. Reported source presence is Proven
+only within the supplied graded inspection result, not independent replay here,
+full normative-corpus inspection, native qualification or an accepted join.
+Source qualification, direction, loss/withholding and incomplete mandatory
+closure remain independent and unchanged. No row is deleted or promoted. In retained row text, locked target rules
+mean unresolved requirements for the future reviewed adopted baseline, never
+authority to publish against the legacy 1.7 model.
+
+| Existing target references and row coverage | Adopted disposition and remaining evidence |
+| --- | --- |
+| O25-V1–V4 and O25-C1–C4 battery/limits/status/electrical/cell/counter/diagnostic searches | Changed Sensor/Topology context to revision 1; unchanged EPM revision 3. EEM revision 2 / DEM revision 4 source presence; battery, DC, limits and diagnostic joins Unknown. |
+| O25-G1–G7 thermostat/air-conditioner/setpoint/mode/status/sensor/fan/HVAC searches | Unknown prior Thermostat identity → revision 11 source presence; exact sensor/fan/air-conditioner targets and Gree property semantics Unknown. Raw/candidate/map distinctions unchanged. |
+| Reverse thermostat/mode/setpoint/fan and every other representable family | Unknown separate reverse joins; in-memory encoding is no effect evidence. All 15 source groups retained, no native sweep repeated. |
+
+For each candidate, obtain the retained Matter 1.6.1 normative device/cluster
+corpus and inspect the adopted SDK definitions, referenced features, attributes,
+commands, events, access, units, ranges, nullability and transitive mandatory
+composition. Public [upstream source](https://github.com/SukramJ/go-fabric/tree/main)
+locates the implementation; it does not supply the missing retained model corpus.
+Reconcile generated behavior and accepted public semantic target evidence with
+each native fact, direction, loss and falsifier. Do not substitute legacy
+connectedhomeip samples or the sole EVSE current mapping for another family.
+Actual lock migration and matching build/reporting evidence remain owner work.
+
+Descriptor and Power Topology composition, PowerMode, NumberOfMeasurementTypes,
+non-empty matching Accuracy and evidenced nullable ActivePower remain unresolved
+for the electrical route. No full normative corpus, Linux arm64 build, accepted
+production profile, conformance, certification or interoperability is established.
+Production admission remains denied. Native evidence and partial last-known-good
+state, eBUS MCP compatibility and GraphQL parity remain unchanged.
+
 ## Evidence, identity and direction
 
 The public native contracts [V], [C] and [G] are the authority for native facts;
@@ -49,12 +94,13 @@ offline check, physical qualification false. No replay was executed here.
 
 **T?** in every row means the candidate device type/revision, cluster/revision,
 feature selection, attribute/command/event correspondence and mandatory closure
-are **Unknown**. Target names are Hypothesis search terms only. The full locked
-Matter 1.7 device/cluster corpus and go-fabric source are unavailable. No IDs or
+are **Unknown**. Target names are Hypothesis search terms only. The full adopted
+Matter 1.6.1 normative device/cluster corpus is unavailable; the supplied
+graded report establishes only the bounded source identities in the baseline. No IDs or
 mandatory-feature lists are inferred from names. Exact locked target inspection,
 accepted public semantic mapping, source qualification, composition and matching
 build/reporting evidence remain required separately for every join. Qualification
-against native Go go-fabric 0.8.0 or later is transport-agnostic and unverified;
+against native Go go-fabric on the adopted Matter 1.6.1 model is transport-agnostic and unverified;
 there is no C++ sidecar. The [reviewed lock][L] has no accepted composition-profile
 digest, so production admission remains denied regardless of these source rows.
 
@@ -147,7 +193,7 @@ separate across profiles, directions and scopes. [Storage](storage.md) and the
 existing thermal pages retain their canonical facts; no cross-transport alias
 or new endpoint sharing is decided here.
 
-Next review must inspect every relevant locked target device type and cluster
+Next review must inspect every relevant adopted target device type and cluster
 in both directions, expand feature conditions and mandatory attributes through
 [I]'s closure procedure, reconcile exact semantic joins, and record all
 exclusions with evidence. Pumps, thermostats, B524 and every other representable

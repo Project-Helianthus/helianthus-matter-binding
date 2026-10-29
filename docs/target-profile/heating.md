@@ -20,7 +20,7 @@ partial last-known-good behavior remain requirements for any future consumer.
 ## Evidence axes and notation
 
 Each row separates four decisions: native evidence, semantic representability,
-locked target-model evidence, and production admission. **Proven** means the
+adopted target-model evidence, and production admission. **Proven** means the
 cited source establishes the stated code or contract behavior; it never means
 an installation is qualified. **Hypothesis** means a proposed interpretation or
 correspondence with a stated falsifier. **Unknown** means evidence is absent or
@@ -46,13 +46,13 @@ change Q?.
 **T? / denied**, repeated in every row, means target device type, cluster,
 feature and attribute are all **Unknown**, and production admission is denied.
 It is not a negative claim about support in the uninspected Matter schema.
-Every row also requires **G0**: locked-corpus reconciliation, evidence-backed
+Every row also requires **G0**: adopted-corpus reconciliation, evidence-backed
 mandatory target composition, independent build evidence, and a future reviewed
 accepted profile. None is supplied by this document.
 
-## Locked target metadata, not a heating schema inspection
+## Retained legacy target metadata, not a heating schema inspection
 
-The lock [L] names data-model version `1.7`. Its explicit target metadata is
+The legacy lock [L] still names data-model version `1.7`. Its explicit target metadata is
 Electrical Sensor `0x0510` revision 2, Power Topology `0x009C` revision 2,
 Electrical Power Measurement `0x0090` revision 3, and optional `ActiveCurrent`
 `0x0005`. These identifiers and revisions are **lock metadata only**; no heating
@@ -141,35 +141,49 @@ In-scope ancillary pressure, humidity, configuration, counters and schedules
 are retained above so representability gaps are visible rather than silently
 relabelled as temperature, mode, demand or fault facts.
 
-## Later locked-corpus reconciliation
+## Matter 1.6.1 target reconciliation
 
-Perform these searches only in a separately provisioned checkout of the exact
-SDK selected by [L]. They are a follow-up evidence request, not commands run for
-this inventory. No unrelated SDK or remembered numeric IDs may fill T?.
+The adopted SDK is [go-fabric](https://github.com/SukramJ/go-fabric) on
+**Matter 1.6.1**, as recorded in the [baseline](../SDK_BASELINE.md).
+The checked-in lock, validator, mapping reference and hosted job remain legacy
+Matter 1.7 artifacts pending owner-controlled replacement; they have not been
+migrated. Any lock metadata below describes that retained legacy state only.
+The [deferred ledger](../adoption/matter-161-deferred.md) separates Sensor
+Electrical Alarm and Power Topology ElectricalCircuit deferrals from the
+absent DEM PowerRangeAdjustment upstream snapshot gap.
 
-1. Inspect the exact files named by [L]: `data_model/1.7/spec_sha`,
-   `data_model/1.7/spec_tag`, `data_model/1.7/device_types/ElectricalSensor.xml`,
-   `data_model/1.7/clusters/ElectricalPowerMeasurement.xml`,
-   `zzz_generated/app-common/clusters/ElectricalPowerMeasurement/AttributeIds.h`
-   and `examples/all-devices-app/all-devices-common/device/types/electrical-sensor/ElectricalSensor.cpp`.
-   This reconciles lock metadata with its existing electrical target only.
-2. Find heating candidates without assuming file names:
-   `rg -n -i 'thermostat|temperature|water.?heater|hot.?water|heating|pump|humidity' data_model/1.7/device_types data_model/1.7/clusters`.
-   Record exact resulting files and definitions for each row; no match is not
-   by itself a standards-wide absence claim.
-3. In each resulting device/cluster definition, inspect the complete mandatory
-   and conditional requirements, revisions, features, attributes, units,
-   nullability, ranges, commands, access and conformance dependencies. Search
-   `rg -n -i 'mandatory|conformance|feature|attribute|command|revision|access'`
-   on those exact resulting files; follow imported definitions and global
-   requirements rather than treating the search as a complete schema review.
-4. Reconcile generated headers under `zzz_generated/app-common/clusters`,
-   actual endpoint composition and locked build/controller evidence. Record
-   mandatory facts unavailable from these native paths. Any prospective target
-   mapping still needs its public semantic owner and reviewed composition.
+This table applies to every existing source row and target search on this page.
+**Changed** and **Unchanged** describe only the stated identity comparison;
+**Unknown** retains uninspected differences. Reported source presence is Proven
+only within the supplied graded inspection result, not independent replay here,
+full normative-corpus inspection, native qualification or an accepted join.
+Source qualification, direction, loss/withholding and incomplete mandatory
+closure remain independent and unchanged. No row is deleted or promoted. In retained row text, locked target rules
+mean unresolved requirements for the future reviewed adopted baseline, never
+authority to publish against the legacy 1.7 model.
 
-Until this work is complete, every target tuple and heating mandatory-cluster
-list remains Unknown. No native evidence grade upgrades a target evidence grade.
+| Existing target references and row coverage | Adopted disposition and remaining evidence |
+| --- | --- |
+| Thermostat, heating/cooling, temperature and humidity searches | Unknown comparison → Thermostat revision 11 source presence; exact sensor targets, heating/cooling features and commands Unknown. |
+| Water heater, hot water, pump, mixer/valve, solar/cylinder, counters and configuration searches | Unknown target definitions and joins; retain every system/zone/circuit/DHW/boiler/module row and its direction, loss and qualification. |
+| Electrical Sensor / Power Topology / EPM; Descriptor and energy-management context | Changed Sensor/Topology to revision 1; unchanged EPM revision 3. DEM revision 4 source presence supplies no percent demand or native operation. |
+
+For each candidate, obtain the retained Matter 1.6.1 normative device/cluster
+corpus and inspect the adopted SDK definitions, referenced features, attributes,
+commands, events, access, units, ranges, nullability and transitive mandatory
+composition. Public [upstream source](https://github.com/SukramJ/go-fabric/tree/main)
+locates the implementation; it does not supply the missing retained model corpus.
+Reconcile generated behavior and accepted public semantic target evidence with
+each native fact, direction, loss and falsifier. Do not substitute legacy
+connectedhomeip samples or the sole EVSE current mapping for another family.
+Actual lock migration and matching build/reporting evidence remain owner work.
+
+Descriptor and Power Topology composition, PowerMode, NumberOfMeasurementTypes,
+non-empty matching Accuracy and evidenced nullable ActivePower remain unresolved
+for the electrical route. No full normative corpus, Linux arm64 build, accepted
+production profile, conformance, certification or interoperability is established.
+Production admission remains denied. Native evidence and partial last-known-good
+state, eBUS MCP compatibility and GraphQL parity remain unchanged.
 
 ## Manual contract cases and transition review
 
@@ -217,7 +231,7 @@ and cited content locally, not current network reachability or main freshness.
 - [Q] [Controller qualification gap](https://github.com/Project-Helianthus/helianthus-docs-ebus/blob/main/architecture/fixtures/vaillant-controller-qualification-v1.json): evidence status, permitted use and transition contract.
 - [G] [Current gateway driver](https://github.com/Project-Helianthus/helianthus-ebusgateway/blob/main/cmd/gateway/semantic_vaillant.go): functions named in each matrix row; code proves implementation shape, not native qualification.
 
-Remaining parent acceptance includes full locked target inventory, reconciled
+Remaining parent acceptance includes full adopted target inventory, reconciled
 mandatory composition and public target mappings, qualified native/service
 bindings, accepted profile/build evidence, independent review and applicable
 hosted checks. Physical/live-fabric acceptance is separate and is not performed

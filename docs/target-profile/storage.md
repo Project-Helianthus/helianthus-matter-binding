@@ -1,6 +1,6 @@
 # Storage source coverage for the Matter target inventory
 
-This binding-local inventory advances [issue #9](https://github.com/Project-Helianthus/helianthus-matter-binding/issues/9) as a partial source-side slice of [parent #8](https://github.com/Project-Helianthus/helianthus-matter-binding/issues/8). It cannot close the parent or release M42/M43. Full locked-corpus target verification remains open. Nothing here is stable before Helianthus 1.0.
+This binding-local inventory advances [issue #9](https://github.com/Project-Helianthus/helianthus-matter-binding/issues/9) as a partial source-side slice of [parent #8](https://github.com/Project-Helianthus/helianthus-matter-binding/issues/8). It cannot close the parent or release M42/M43. Full adopted-corpus target verification remains open. Nothing here is stable before Helianthus 1.0.
 
 This document inventories existing public native evidence and candidate semantic correspondence. It creates no native fact, adapter, universal target mapping, runtime endpoint, profile admission, acquisition or command. Binding coverage belongs here; protocol-neutral contracts remain with SemReg, native contracts with their driver documentation, and accepted Matter mappings with the public semantic documentation owner. No authentication, principal or permission interface is introduced.
 
@@ -8,7 +8,7 @@ This document inventories existing public native evidence and candidate semantic
 
 Evidence labels are independent of qualification: **Proven** means a cited source explicitly defines the stated bounded behavior; **Hypothesis** means a proposed correspondence awaiting evidence; **Unknown** means required source or target evidence was not inspected. None means hardware qualification, interoperability or certification.
 
-The [reviewed lock][lock] explicitly records data-model version **1.7** and these **lock metadata**, not an inspected full schema:
+The legacy [reviewed lock][lock] still records data-model version **1.7** and these **lock metadata**, not an inspected full schema:
 
 | Lock key | Explicit metadata |
 | --- | --- |
@@ -17,7 +17,7 @@ The [reviewed lock][lock] explicitly records data-model version **1.7** and thes
 | `target.electrical_power_measurement_cluster` | Electrical Power Measurement, `0x0090`, revision 3 |
 | `target.active_current_attribute` | ActiveCurrent, `0x0005`, optional |
 
-These metadata do not identify a battery target, battery feature set, SOC attribute, energy attribute, voltage attribute or status attribute. Their support is **Unknown**, not disproven. The [baseline][baseline] describes only `evse.ac.current` as the accepted mapping; that is not a battery mapping. A battery must not inherit Electrical Sensor admission from the EVSE slice. The actual mapping payload and complete locked SDK schema were not supplied.
+These metadata do not identify a battery target, battery feature set, SOC attribute, energy attribute, voltage attribute or status attribute. Their support is **Unknown**, not disproven. The [baseline][baseline] describes only `evse.ac.current` as the accepted mapping; that is not a battery mapping. A battery must not inherit Electrical Sensor admission from the EVSE slice. The actual mapping payload and complete adopted normative schema were not supplied.
 
 The following codes apply to **every matrix row**, including unavailable rows:
 
@@ -82,20 +82,49 @@ Manual synthetic claim review (reasoned examples, not executed decoder tests):
 | CAN owner has no supplied source | Unknown, no negative hardware-support claim and no constructed facts |
 | Caller labels a composition accepted | Current null profile pin still denies admission |
 
-## Locked-corpus reconciliation still required
+## Matter 1.6.1 target reconciliation
 
-Do not resolve these gaps using another SDK, remembered IDs, or an unreviewed revision. Inspect the lock-selected connectedhomeip corpus later, including the exact `data_model/1.7/spec_sha` and `spec_tag` identities. Required known paths from the lock are `data_model/1.7/device_types/ElectricalSensor.xml`, `data_model/1.7/clusters/ElectricalPowerMeasurement.xml`, `zzz_generated/app-common/clusters/ElectricalPowerMeasurement/AttributeIds.h`, and `examples/all-devices-app/all-devices-common/device/types/electrical-sensor/ElectricalSensor.cpp`.
+The adopted SDK is [go-fabric](https://github.com/SukramJ/go-fabric) on
+**Matter 1.6.1**, as recorded in the [baseline](../SDK_BASELINE.md).
+The checked-in lock, validator, mapping reference and hosted job remain legacy
+Matter 1.7 artifacts pending owner-controlled replacement; they have not been
+migrated. Any lock metadata below describes that retained legacy state only.
+The [deferred ledger](../adoption/matter-161-deferred.md) separates Sensor
+Electrical Alarm and Power Topology ElectricalCircuit deferrals from the
+absent DEM PowerRangeAdjustment upstream snapshot gap.
 
-The following are **pending searches**, not commands run or claims that matching files exist:
+This table applies to every existing source row and target search on this page.
+**Changed** and **Unchanged** describe only the stated identity comparison;
+**Unknown** retains uninspected differences. Reported source presence is Proven
+only within the supplied graded inspection result, not independent replay here,
+full normative-corpus inspection, native qualification or an accepted join.
+Source qualification, direction, loss/withholding and incomplete mandatory
+closure remain independent and unchanged. No row is deleted or promoted. In retained row text, locked target rules
+mean unresolved requirements for the future reviewed adopted baseline, never
+authority to publish against the legacy 1.7 model.
 
-- Search `data_model/1.7/device_types` for `Battery`, `Storage`, `Electrical Sensor`, and their cluster references; inspect every matching device-type XML and its mandatory composition rules.
-- Search `data_model/1.7/clusters` for `Power Topology`, `Descriptor`, `Power Source`, `StateOfCharge`, `Battery`, `Energy`, `Voltage`, `Current`, `Accuracy`, `PowerMode`, `NumberOfMeasurementTypes` and `ActivePower`; follow matched files and referenced feature/conformance conditions, including inherited global attributes.
-- Reconcile each surviving attribute with `zzz_generated/app-common/clusters` generated IDs and the selected app composition; establish units, signedness, nullability, ranges, revisions and mandatory/optional rules for the actual feature set.
-- Inspect the lock-referenced public semantic target mapping payload before accepting any battery mapping; do not extend its EVSE entry by analogy.
+| Existing target references and row coverage | Adopted disposition and remaining evidence |
+| --- | --- |
+| Electrical Sensor / Power Topology / EPM; pack current, voltage and power leads | Changed Sensor/Topology to revision 1; unchanged EPM revision 3; optional ActiveCurrent remains only a lead. DC, sign, scope and mandatory closure Unknown. |
+| Battery, Storage, Power Source, StateOfCharge; SOC/SOH, cell and pack status, capacity, limits, temperature, identity | Unknown target correspondence; no battery target, feature or attribute inferred. Native RS-485, optional battery and unavailable CAN rows retained. |
+| Energy, counters and storage/energy-management operations | Unknown joins; EEM revision 2 and DEM revision 4 source presence does not supply Ah-to-energy conversion, lifecycle, limits or command authority. |
 
-Separately obtain the exact public CAN battery owner contract and implementation, reconcile the Growatt state-validation discrepancy, and provide explicit semantic adapter, identity, counter-reset and lifecycle evidence. Documentary LUNA reopening still needs a pinned vendor definition version, sanitized identity and monitoring fixtures, negative overlap evidence and a revised native applicability contract. No new profile, test result or live qualification is supplied here.
+For each candidate, obtain the retained Matter 1.6.1 normative device/cluster
+corpus and inspect the adopted SDK definitions, referenced features, attributes,
+commands, events, access, units, ranges, nullability and transitive mandatory
+composition. Public [upstream source](https://github.com/SukramJ/go-fabric/tree/main)
+locates the implementation; it does not supply the missing retained model corpus.
+Reconcile generated behavior and accepted public semantic target evidence with
+each native fact, direction, loss and falsifier. Do not substitute legacy
+connectedhomeip samples or the sole EVSE current mapping for another family.
+Actual lock migration and matching build/reporting evidence remain owner work.
 
-The source inventory is complete only for the listed supplied views and explicitly unavailable owner evidence. Full target completeness, accepted composition, exact-target build/fixture evidence, independent review and applicable parent acceptance remain open. Readability and offline link-source correspondence are documentation checks; they prove no semantic/runtime correctness, hardware composition, Matter conformance, certification or production readiness.
+Descriptor and Power Topology composition, PowerMode, NumberOfMeasurementTypes,
+non-empty matching Accuracy and evidenced nullable ActivePower remain unresolved
+for the electrical route. No full normative corpus, Linux arm64 build, accepted
+production profile, conformance, certification or interoperability is established.
+Production admission remains denied. Native evidence and partial last-known-good
+state, eBUS MCP compatibility and GraphQL parity remain unchanged.
 
 [lock]: https://github.com/Project-Helianthus/helianthus-matter-binding/blob/main/sdk/matter-sdk.lock.json
 [baseline]: https://github.com/Project-Helianthus/helianthus-matter-binding/blob/main/docs/SDK_BASELINE.md
@@ -105,3 +134,10 @@ The source inventory is complete only for the listed supplied views and explicit
 [multi]: https://github.com/Project-Helianthus/helianthus-modbusreg/blob/main/growatt_bms_rs485_multigroup.go
 [growatt]: https://github.com/Project-Helianthus/helianthus-docs-modbus/blob/main/protocols/growatt/bms-rs485-1xsxxp-v202.md
 [luna]: https://github.com/Project-Helianthus/helianthus-docs-modbus/blob/main/protocols/huawei/inverter-battery-readonly-v1.md
+
+Separately obtain the exact public CAN battery owner contract and implementation,
+reconcile the Growatt state-validation discrepancy, and provide explicit semantic
+adapter, identity, counter-reset and lifecycle evidence. Optional battery
+reopening still needs a vendor definition version, synthetic/public identity
+and monitoring fixtures, negative overlap evidence and a revised native
+applicability contract. No new native profile or qualification is supplied.
