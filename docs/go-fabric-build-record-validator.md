@@ -1,6 +1,8 @@
 # Offline build-record structural validation
 
-Issues #29 and #33 implement partial slices of #24 / Project #2. The isolated
+Issues #29 and #33 implement partial slices of #24 / Project #2. Issue #61
+retargets their guidance for #59 direction 2 without changing the generic API.
+The isolated
 [`qualification/buildrecord`](../qualification/buildrecord/record.go) package
 uses only the Go standard library and supplied in-memory records. It is
 scaffolding, not a decision about runtime layout, persistence or registration.
@@ -32,13 +34,43 @@ at or above `v0.8.0`. Each component must fit an unsigned 64-bit integer.
 Missing/older releases, ranges, `latest`, wildcards, prereleases and build metadata
 fail the declaration. A later exact release needs a new matching scope and results;
 selection alone supplies no authenticity, build success or platform support.
-The baseline comes from supplied release notes; actual API/source inspection
-remains Unknown. No SDK lock, module or dependency pin changes.
+This is the existing generic validation rule and historical fixture baseline,
+not the current adoption pin. The owner must supply the exact adoption tag; it
+is missing here. Actual source inspection for that attempt remains Unknown.
+No SDK lock, module or dependency pin changes.
 
-Linux `amd64` and `arm64` are intended qualification targets. Records explicitly
+For adoption, Linux `amd64` and `arm64` are both mandatory qualification
+targets. Records explicitly
 supply ABI, CGO, compiler/linker, tags/features and toolchain manifest for each
 attempt. They are not supported-platform assertions or automatic target defaults.
 The validator permits other explicitly declared tuples without claiming support.
+
+AA06's adoption wrapper applies a narrower policy over these same generic
+records, not a parallel B ledger. It must enforce the owner-supplied exact tag,
+both Linux architectures and matching B1–B8 parents plus B4–B6 children for each
+role/target. The generic API itself permits other rosters; its structural success
+cannot prove that adoption policy was applied. A minimal adoption attempt has
+28 results, with further children for additional declared tuples. See the
+[initial B1–B8 assessment](go-fabric-build-qualification.md#adoption-wrapper-and-initial-assessment):
+all real rows and required children are missing until retained evidence exists;
+producer-only claims stay unverified. No real wrapper execution is asserted here.
+
+Declare the OS, architecture, ABI, CGO mode, compiler/linker, tags/features,
+toolchain, exact source-derived selected tests and execution environment per
+attempt. Native B5 execution on each architecture is distinct from B4
+cross-compilation; producing an arm64 test binary on amd64 is not arm64 execution.
+Label emulation separately; it cannot replace required native execution. Explicitly
+exclude and track the independent-controller leg separately from strict offline
+B5. No upstream green metadata or module checksum alone can promote a row.
+
+Producer and verifier must each replay the same bounded plan from retained inputs
+in clean outputs, retaining actual commands, exits, counts, logs and manifests.
+Role-token inequality alone does not prove independent execution. B2 dependency
+and SQLite closure and B6 extracted-model/generator/tool obligations must reconcile
+with the [notices ledger](adoption/notices-ledger.md). Missing rights evidence
+remains Unknown and prevents qualification even if generic structure is complete.
+Actual cache closure, hosted workflow replacement and real producer/verifier runs
+are AA08's follow-through; this documentation performs none of them.
 
 Every result joins exactly on upstream release, source, dependency, toolchain
 and generator/input manifest digests; OS, architecture, ABI, CGO, compiler, linker, tags and features;
@@ -97,8 +129,9 @@ eeBUS output binding remain unchanged.
 
 ## Synthetic example and tests
 
-The [tests](../qualification/buildrecord/record_test.go) construct synthetic
-records selecting `v0.8.0` and declaring Linux `amd64` and `arm64` with synthetic
+The [tests](../qualification/buildrecord/record_test.go) construct historical generic
+synthetic records selecting `v0.8.0` and declaring Linux `amd64` and `arm64`
+with synthetic
 ABI/compiler/linker/toolchain evidence, eight ledger parents and six target
 children per role: 28 results total.
 Every child has two runs; each B5 run declares two selected, executed and passed
@@ -107,6 +140,7 @@ tests. All digests are computed from public synthetic strings with
 This shape returns `structurally-complete`. Changing just a compile result's
 source manifest fails its identity join. Removing a verifier child is unresolved;
 changing a B6 output fails; losing a log after completeness reopens the result.
+The historical `v0.8.0` examples are not a new pin or adoption tag.
 None of these examples executes go-fabric or grants admission.
 
 `TestBuildRecordIdentity` varies each of the 20 fields independently for B4–B6
