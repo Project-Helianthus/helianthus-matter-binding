@@ -28,12 +28,12 @@ evidence gaps. Neither is native execution evidence.
 Measurement implementation. Internal arithmetic labels do not establish a
 measurement type, sign convention, physical topology or accepted mapping.
 
-**Unknown:** exact Matter 1.7 target definitions and go-fabric representation,
-ranges, reserved values, null encoding, units/scales, features and transitive
-composition closure. Required evidence is inspection of the reviewed locked
-`data_model/1.7/clusters/ElectricalPowerMeasurement.xml`, its referenced types
-and generated representation, Electrical Sensor requirements, Descriptor and
-Power Topology dependencies, plus the matching go-fabric types, codecs and
+**Unknown:** exact selected Matter 1.6.1 target definitions and go-fabric
+representation, ranges, reserved values, null encoding, units/scales, features
+and transitive composition closure. Required evidence is inspection of the
+selected 1.6.1 Electrical Power Measurement definition, its referenced types and
+generated representation, Electrical Sensor requirements, Descriptor and Power
+Topology dependencies, plus the matching go-fabric types, codecs and
 build/test evidence. The accepted public semantic target mapping and public
 native contract for each source fact must also be inspected. Source labels or
 an SDK sample cannot supply absent evidence. No normative identifiers or
@@ -141,3 +141,28 @@ integration, transport behavior, passive capture evidence, hardware smoke,
 interoperability, certification or production readiness. Independent review,
 matching committed-head checks and the parent's remaining integration and
 physical acceptance are outside this slice. No special merge hold is added.
+
+## Reference factory and target encoding
+
+The [reference factory matrix](../adoption/reference-bridge.md#candidate-factory-validation-matrix-and-execution-order)
+places EPM after the one-sensor reference, Thermostat/HVAC and EEM. The adopted
+SDK direction uses Matter 1.6.1; the earlier lock's 1.7-only elements are deferred.
+This documentation changes neither the candidate nor the lock.
+
+The finite factory controls independently vary Owner, Profile, Source, Scope,
+Phase and Fact with every other field valid. Dropping each individual axis from
+the duplicate/join key or returned envelope must fail the corresponding sibling
+isolation case. Retain valid zero and signed-power controls alongside duplicate,
+unavailable-with-value, unknown unit, precision-loss and both overflow cases.
+These are reasoned future factory mutation targets, not new tests or executed
+mutation evidence in this slice.
+
+Inspect actual selected EPM units/scales/ranges/nulls and transitive composition
+before encoding. Local W, var, VA, A, V, Hz and ratio labels, and the -18..18
+scale bounds, define internal arithmetic only. Exact 12.345 W to integer 12345
+at output scale -3 proves no target wire representation. Source phase/scope/sign
+must survive; scale/magnitude cannot synthesize Accuracy, measurement count or
+PowerMode. Unavailable remains distinct from known zero. Native evidence,
+qualification and partial last-known-good facts survive withheld encoding;
+SDK receipt, store durability and resource teardown remain independent and
+unverified. No successful vector grants production admission.

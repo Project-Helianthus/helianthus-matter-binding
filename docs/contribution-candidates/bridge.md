@@ -87,12 +87,13 @@ belongs to local review evidence, not a library-support claim.
 **Proven:** only the synthetic structural behaviors exercised by the focused
 tests. This does not qualify a native source or establish a semantic mapping.
 **Hypothesis:** this local association model may be useful for later SDK-boundary
-integration review. **Unknown:** actual Matter 1.7 Bridged target closure,
+integration review. **Unknown:** selected Matter 1.6.1 Bridged target closure,
 required device/cluster revisions, feature conditions, endpoint constraints and
 go-fabric library support. No normative IDs or feature support are supplied.
 
-Required evidence remains inspection of the reviewed lock's exact target
-definitions and mandatory dependency closure; public native contracts first,
+Required evidence remains inspection of the selected 1.6.1 target definitions
+and mandatory dependency closure, reconciled with the earlier lock's deferred
+1.7 target; public native contracts first,
 then inspected native source and accepted semantic evidence; accepted target
 mappings at their public semantic owner; and library APIs plus matching build,
 graph/lifecycle, persistence/recovery and reporting evidence for that target.
@@ -108,3 +109,27 @@ No authorization gate is introduced before 0.9; any new authorization roadmap
 work remains a 0.11 subject. No transport matrix, runtime integration, native
 qualification, certification, interoperability, physical or live-fabric smoke
 result is claimed. This slice does not close parent #24.
+
+## Reference factory admission boundary
+
+The [one-sensor reference and finite factory matrix](../adoption/reference-bridge.md#candidate-factory-validation-matrix-and-execution-order)
+is the runtime connection contract under #62 / #59. The adopted SDK direction
+uses Matter 1.6.1; the earlier lock's 1.7-only elements are deferred, not
+implicitly ported. This changes no pin or executable validator. Reference first,
+then Thermostat/HVAC, then EEM, then EPM; bridge history review applies at every
+stage. A passing Review alone cannot connect or allocate an endpoint.
+
+The factory must retain the complete source key Node/Owner/Profile/Capability
+when mapping to the runtime node/capability/composition key. Never discard scope
+or provenance to make those keys match. Composition, Binding and Slot continuity
+and Retired history survive shutdown/restart: a retired slot remains reserved
+within that node lifecycle. Reusing it for another key, dropping history or
+reactivating it is withheld, including after an ambiguous store outcome.
+
+Validate one active sensor plus an independent sibling, then each source-key
+axis, each continuity field, retirement loss/reversal/reuse, graph parent/child
+references, duplicates, multiple parents and cycles. Expected associations must
+be independent of the factory's key builder. Actual SDK graph composition,
+store durability, allocation callbacks and teardown remain Unknown. The runtime
+row ledger retains all missing/failed/unverified evidence and the separate
+zero-production-allocation control. No new test or executed mutant is claimed.
