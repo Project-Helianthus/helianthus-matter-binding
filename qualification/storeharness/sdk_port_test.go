@@ -517,6 +517,93 @@ func TestAA11WithdrawalReservationsAcrossHarnesses(t *testing.T) {
 	}
 }
 
+// A replacement harness shares only the adapter, so the adapter must fence a
+// confirmed write itself. Marking only Ambiguous writes unresolved exposes the
+// record at the replacement Start, whether or not the old callback has drained.
+func TestAA11ReplacementHarnessFencesConfirmedWrite(t *testing.T) {
+	for _, drained := range []bool{true, false} {
+		t.Run(fmt.Sprintf("drained=%v", drained), func(t *testing.T) {
+			p, scope := aa11Fixture()
+			sibling := aa11Request(scope, "b")
+			p.endpoints[scope][sibling.Key] = sibling
+			s, h := aa11Harness(t, p, scope)
+			c := aa11Begin(t, h, aa11Request(scope, "a"))
+			if c.Outcome != Confirmed {
+				t.Fatal("confirmed fixture")
+			}
+			h.Stop()
+			if drained && !h.Complete(c) {
+				t.Fatal("completion lost")
+			}
+			next, err := New(s, 200)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(next.Stop)
+			if _, err = next.Start(); err != nil {
+				t.Fatal(err)
+			}
+			siblingOnly := Snapshot{sibling.Key: sibling.Association}
+			equal(t, next.Exposed(), siblingOnly)
+			equal(t, next.Accepted(), siblingOnly)
+
+			delete(p.endpoints[scope], c.Key)
+			if err = s.Reconcile(next); err != nil {
+				t.Fatal(err)
+			}
+			equal(t, next.Exposed(), siblingOnly)
+
+			bad := c.Request
+			bad.Token++
+			p.endpoints[scope][c.Key] = bad
+			if err = s.Reconcile(next); err == nil {
+				t.Fatal("changed stored identity accepted")
+			}
+			equal(t, next.Exposed(), siblingOnly)
+
+			p.endpoints[scope][c.Key] = c.Request
+			writes := p.writes
+			if err = s.Reconcile(next); err != nil {
+				t.Fatal(err)
+			}
+			if p.writes != writes {
+				t.Fatal("reconciliation retried a write")
+			}
+			equal(t, next.Exposed(), Snapshot{sibling.Key: sibling.Association, c.Key: c.Association})
+			aa11Sentinel(t, p)
+		})
+	}
+}
+
+// The same fence holds after a completion published by the old harness, and
+// neither a second replacement nor a restart of that harness releases it.
+func TestAA11ConfirmedWriteRequiresReconcileAfterRestart(t *testing.T) {
+	p, scope := aa11Fixture()
+	s, h := aa11Harness(t, p, scope)
+	c := aa11Begin(t, h, aa11Request(scope, "a"))
+	if !h.Complete(c) {
+		t.Fatal("completion lost")
+	}
+	equal(t, h.Exposed(), Snapshot{c.Key: c.Association})
+	for range 2 {
+		h.Stop()
+		if _, err := h.Start(); err != nil {
+			t.Fatal(err)
+		}
+		equal(t, h.Exposed(), Snapshot{})
+	}
+	if err := s.Reconcile(h); err != nil {
+		t.Fatal(err)
+	}
+	equal(t, h.Exposed(), Snapshot{c.Key: c.Association})
+	h.Stop()
+	if _, err := h.Start(); err != nil {
+		t.Fatal(err)
+	}
+	equal(t, h.Exposed(), Snapshot{c.Key: c.Association})
+	aa11Sentinel(t, p)
+}
+
 func TestAA11AmbiguousCompletionWithdrawal(t *testing.T) {
 	p, scope := aa11Fixture()
 	sibling := aa11Request(scope, "b")

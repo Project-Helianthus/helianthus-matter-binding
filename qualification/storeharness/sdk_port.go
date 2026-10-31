@@ -92,7 +92,7 @@ func (s *SDKStore) Read() (Snapshot, error) {
 	}
 	snapshot := Snapshot{}
 	for k, r := range records {
-		// An explicit exact readback, not restart alone, releases ambiguity.
+		// An explicit exact readback, not restart alone, releases an adapter write.
 		if _, unresolved := s.unresolved[k]; !unresolved && !s.withdrawn[k] {
 			snapshot[k] = r.Association
 		}
@@ -123,10 +123,10 @@ func (s *SDKStore) Write(r Request) Outcome {
 	if o != Confirmed && o != PrecommitFailure {
 		o = Ambiguous
 	}
+	// Completion reaches only the issuing harness, so the adapter fences a
+	// confirmed write too: a replacement harness shares nothing else with it.
 	if o != PrecommitFailure {
 		s.expected[r.Key] = r
-	}
-	if o == Ambiguous {
 		s.unresolved[r.Key] = r
 	}
 	return o
