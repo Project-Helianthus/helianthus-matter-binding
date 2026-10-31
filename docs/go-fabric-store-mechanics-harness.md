@@ -85,6 +85,18 @@ Explicit reconciliation with both original associations exposes both in the
 mock model. A replacement binding or slot is rejected and the second survives.
 No controller, credential, fabric token or real endpoint number is involved.
 
+The injected `SDKStore` seam also permits mock withdrawal after an ambiguous
+completion. Withdrawal requires the endpoint's pending callback to complete and
+retains its identity, reservation and fabric records. The adapter remembers
+withdrawal for accepted or uncertain identities, so later exact reconciliation
+and restarts of the same harness and adapter do not expose that endpoint.
+Before committing a new key, the adapter rejects binding or slot collisions
+against every retained record, including withdrawn endpoints hidden from a new
+harness using the same adapter. A distinct association remains permitted within
+the retained-record budget.
+This intent is instance-local; it does not establish cross-process recovery or
+authorize any live fabric operation.
+
 ## Adapter durability and retirement
 
 The [one-sensor reference](adoption/reference-bridge.md) uses this barrier model
