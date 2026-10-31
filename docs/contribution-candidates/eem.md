@@ -21,13 +21,13 @@ Unknown; a family name or a signed value cannot fill them.
 **Proven:** the local validator enforces the synthetic conventions below under
 its focused tests. This says nothing about native source qualification.
 **Hypothesis:** these distinctions may be useful in a later binding-owned energy
-implementation. **Unknown:** the inspected Matter 1.7 energy target definitions,
+implementation. **Unknown:** the selected Matter 1.6.1 energy target definitions,
 feature conditions, units, ranges, nullability, device composition, accepted
 semantic mapping and go-fabric library implementation. This record assigns no
 normative cluster identifiers or feature support and supplies no target encoder.
 
 Required evidence before a target implementation: inspect the energy-related
-elements of the exact reviewed locked data-model corpus, their revisions and
+elements of the selected 1.6.1 data-model corpus, their revisions and
 mandatory/conditional closure; reconcile the public docs-semantic mapping with
 native direction, reset continuity, period and scope; inspect the selected
 go-fabric types/encoding and demonstrate matching build and fixture evidence.
@@ -131,6 +131,33 @@ physical acceptance remain separate. No full CI, transport matrix, passive
 capture, live-fabric smoke, certification or interoperability result is claimed.
 No sibling contribution candidate is a dependency. No authorization gate is
 introduced; future authorization planning remains a 0.11 subject.
+
+## Reference factory and target encoding
+
+The [reference factory matrix](../adoption/reference-bridge.md#candidate-factory-validation-matrix-and-execution-order)
+places EEM after the one-sensor reference and Thermostat/HVAC, before EPM.
+The adopted SDK direction uses Matter 1.6.1; the earlier lock's 1.7-only elements
+are deferred. This changes neither the validator nor dependency pins.
+
+A later factory must retain Owner, Profile, Fact, Scope, Direction, Kind,
+ResetEpoch, HasInterval, Start and End exactly. The finite controls include all
+four direction/kind combinations, known zero, unknown value/continuity, partial
+coverage and overflow. Vary Owner/Profile/Fact/Scope/Direction/ResetEpoch/Start/End
+independently using valid records; omission of each field from expected/observed
+comparison must fail its corresponding mismatch case. Kind and HasInterval
+cannot change individually while retaining valid structure: test their valid
+kind/interval tuple separately, and test missing presence/invalid bounds as
+structural guards. This distinction prevents claiming valid axis coverage from
+an earlier validation rejection. These are reasoned factory mutation targets;
+no new test or executed mutant is claimed here.
+
+Magnitude times WhPerUnit yields local whole Wh only. Inspect selected energy
+codec units/scales, nullability, interval representation, reset continuity and
+mandatory composition before encoding. Do not assign direction from sign, infer
+export from generation, sum periodic vectors into totals or convert unknown to
+zero. Keep native bytes, loss and partial last-known-good state unchanged even
+when encoding is withheld. A valid vector is not an SDK report receipt, durable
+store result or runtime qualification. Those boundaries remain unverified.
 
 [issue]: https://github.com/Project-Helianthus/helianthus-matter-binding/issues/37
 [parent]: https://github.com/Project-Helianthus/helianthus-matter-binding/issues/24

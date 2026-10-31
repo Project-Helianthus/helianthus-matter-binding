@@ -1,9 +1,11 @@
 # Offline go-fabric build qualification evidence
 
-This proposed contract addresses issues #25 and #33, partial slices of #24 / Project #2.
-It defines the evidence needed to review the chosen native-Go go-fabric direction
-on a later Helianthus branch. It neither selects a new SDK nor completes parent
-steps 1–2. Nothing here is stable before Helianthus 1.0. This is a document review
+Issue #61 retargets the existing issues #25 and #33 qualification contract for
+#59 direction 2 / Project #2. The owner has selected go-fabric as the Matter SDK
+direction now, on its Matter 1.6.1 data model; Matter 1.7-only elements are
+deferred. Selection is not build qualification or production admission. This
+document neither changes an SDK pin nor completes #59 or the earlier #24 work.
+Nothing here is stable before Helianthus 1.0. This is a document review
 contract, not an implemented report parser or runtime interface.
 
 ## Current authority and explicit unknowns
@@ -12,42 +14,85 @@ The [binding ownership rules](https://github.com/Project-Helianthus/helianthus-m
 place SDK selection, allocation and integration at this boundary. The
 [reviewed lock](https://github.com/Project-Helianthus/helianthus-matter-binding/blob/main/sdk/matter-sdk.lock.json)
 and [SDK baseline](https://github.com/Project-Helianthus/helianthus-matter-binding/blob/main/docs/SDK_BASELINE.md)
-remain authoritative for the existing SDK selection and bounded sample fixture.
-Their existing build targets are not go-fabric qualification targets.
+still describe the existing connectedhomeip implementation and bounded sample
+fixture. They have not been retargeted by this documentation slice and do not
+supply go-fabric build evidence. The owner decision in #59 supersedes their SDK
+direction; AA08 owns the actual cache closure, pin/workflow follow-through and
+producer/verifier runs. Existing build targets are not go-fabric qualification
+targets. No conformance or certification follows from the selection.
 
-The [readiness evaluator](https://github.com/Project-Helianthus/helianthus-matter-binding/blob/main/runtime/production_readiness.py)
-checks the reviewed lock and denies allocation when
-`accepted_runtime_composition_profile_sha256` is null, before trusting caller
-composition or build metadata. This contract leaves that behavior and the lock
-untouched. Even a fully passing report below cannot admit a production endpoint.
-The [inventory completeness contract](https://github.com/Project-Helianthus/helianthus-matter-binding/blob/main/docs/target-profile/inventory-completeness.md)
+The [readiness evaluator](../runtime/production_readiness.py) checks the reviewed
+lock and denies allocation when `accepted_runtime_composition_profile_sha256`
+is null, before trusting caller composition or build metadata. This contract
+leaves that behavior and the lock untouched. Even a fully passing report below
+cannot admit a production endpoint. The
+[inventory completeness contract](target-profile/inventory-completeness.md)
 separately requires source semantics, target closure and accepted mapping evidence.
 Build results supply none of those missing facts by default.
 
-Issue #33 declares `v0.8.0` as the baseline upstream release selection, based
-on the supplied release notes. Later qualification attempts must newly declare
-one exact stable release at or above that baseline (`vMAJOR.MINOR.PATCH`), never
-`latest`, a range, wildcard, prerelease or build-metadata alias. This selection
-changes no SDK lock, module or dependency pin. A release label establishes
-neither authentic source bytes, successful compilation nor target support.
-Actual API/source inspection remains **Unknown**.
+The exact go-fabric tag must be supplied by the owner for the adoption attempt.
+It is **missing** here: do not derive it from an old example, upstream green
+metadata, a moving branch or a research comparison. Record one canonical exact
+stable release (`vMAJOR.MINOR.PATCH`), never `latest`, a range, wildcard,
+prerelease or build-metadata alias. Match it across all retained inputs and both
+roles. A release label or literal module checksum supplies neither authentic
+source bytes, successful compilation, rights closure nor target support.
 
-Linux `amd64` and Linux `arm64` are intended qualification targets, not supported
-platforms. Each record must declare its own ABI, CGO mode, compiler, linker,
-tags/features and exact toolchain manifest; no host defaults or inferred values
-are supplied. Each declared target still requires both roles' B4–B6 children.
-A changed target tuple or release starts a new assessment with matching evidence;
-no earlier result is inherited. No real go-fabric build is performed by this slice.
+Linux `amd64` and Linux `arm64` are mandatory adoption targets, not supported
+platform claims. Each needs its own explicit OS, architecture, ABI, CGO mode,
+compiler, linker, tags/features and exact toolchain manifest, plus both roles'
+B4–B6 children. No host defaults fill these fields. Native execution means tests
+actually run on the declared architecture; record the execution environment and
+its architecture evidence. Cross-compilation, including emission of a test binary,
+is only B4 evidence. Emulated execution must be labelled separately and does not
+substitute for the required native run. An amd64 host result never proves arm64
+execution, Pi performance or latency. A changed tuple or release starts a new
+assessment without inherited passes.
 
-No go-fabric source tree or module is available in the reviewed source set.
-Its actual public source origin, APIs, module graph, test names, toolchain needs,
-generators, supported platforms and feature support are **Unknown**. No platform
-result or successful command for go-fabric is asserted here. The native-Go choice
-is direction, not evidence of implementation readiness. Requirements below are
-proposals for later evidence production; the current baseline claims above come
-from the linked sources. Moving `blob/main` links locate public documents, not
-immutable qualification evidence. A later report must bind the actual inspected
-bytes as specified below. No upstream source URL is guessed.
+No real go-fabric source tree, retained module closure or owner-selected tag is
+supplied for this slice. Source-derived APIs, exact test identities, toolchain
+requirements, generator inputs and platform outcomes for the adoption attempt
+remain **Unknown** until inspected and replayed. The owner selection is current;
+the historical suitability report is not a retained build bundle. Moving
+`blob/main` links locate public documents, not immutable qualification evidence.
+
+## Adoption wrapper and initial assessment
+
+AA06's adoption wrapper constrains the existing generic
+[build records](go-fabric-build-record-validator.md); it is not a second B ledger.
+The generic validator checks supplied structure and allows explicitly declared
+rosters. The adoption wrapper must require the owner-selected tag and both Linux
+architectures, reconcile the same input identity and require the existing eight
+parents and B4–B6 children for both roles. For the minimal two-target roster this
+is 28 results: 16 parents and 12 children. Additional ABI/CGO/tag tuples require
+additional children; they cannot silently replace either mandatory architecture.
+This is the wrapper's documentation contract, not evidence that its implementation
+or any real SDK run passed. A structurally complete generic record alone cannot
+close adoption.
+
+Use the following initial assessment on the existing B1–B8 rows. These are current
+gaps, not fabricated producer/verifier results. Every required child begins
+missing; any later complete-looking producer claim remains unverified pending
+independent replay.
+
+| Existing row | Initial adoption state | Missing evidence / child trace |
+| --- | --- | --- |
+| B1 | missing | Owner-selected exact tag, retained origin/source and patch manifests. |
+| B2 | missing | Actual direct/transitive dependency, SQLite, native-library and tool closure; [notices ledger](adoption/notices-ledger.md) outcomes Unknown. |
+| B3 | missing | Exact offline plan, both tuples, native execution environments, source-derived selected tests, exclusions and replay inputs. |
+| B4 | missing | Producer and verifier compile/link child for Linux amd64 and Linux arm64, separately keyed to each tuple. |
+| B5 | missing | Producer and verifier native test child for Linux amd64 and Linux arm64, exact selections, nonzero execution and repeat logs. |
+| B6 | missing | Producer and verifier generator/input child for Linux amd64 and Linux arm64, retained input/tool rights and two clean generation runs per role. |
+| B7 | missing | Reconciliation of all parents, children, manifests, logs, outputs and rights evidence. |
+| B8 | missing | B1–B7 closure and independent bounded decision; runtime remains denied. |
+
+Before execution, declare exact selected package/test identities from inspected
+source, fixtures, expected values, counts, repeats and bounds. Do not invent SDK
+APIs or treat generic harness tests as actual SDK tests. Explicitly exclude the
+independent-controller leg (for example a separately pinned chip-tool or matter.js
+controller) from strict offline B5: it needs its own reviewed plan and retained
+interaction evidence and cannot be inferred from an in-memory fixture. Exclusion
+does not remove that broader acceptance obligation or authorize any live fabric.
 
 ## Report identity, producers and verification
 
@@ -91,11 +136,13 @@ not new credential, principal, permission or authorization gates.
 ## Finite evidence ledger
 
 Use exactly these eight required rows, with per-target children for B4–B6.
+The adoption wrapper requires both Linux targets described above; the generic
+record format remains reusable for other explicitly bounded scopes.
 Declare a finite nonempty target list and a finite nonempty deterministic test
 selection for each claimed execution target before running. List exclusions and
 why they do not establish coverage. An omitted target is outside the claim, not
-supported. The intended Linux targets above have no established qualification
-results; actual source-derived test selection remains Unknown.
+supported. The mandatory adoption Linux targets above have no established
+qualification results; actual source-derived test selection remains Unknown.
 
 | Row | Required producer evidence | Verifier responsibility and pass criterion |
 | --- | --- | --- |
@@ -125,6 +172,21 @@ establish compile repeatability only; it cannot be labelled byte reproducible.
 Generated source still requires the exact-byte B6 comparison. Log sanitization
 must retain commands, counts, exits and evidence identity; if safe retention is
 impossible, withhold the affected result rather than invent a replacement log.
+
+## Generated-input rights closure
+
+B2 inventories actual compiled/transitive inputs, including SQLite on any selected
+storage route; a notice calling it test-only cannot overrule inspected imports.
+B6 links every extracted model, schema, generated path, generator/tool and exact
+input to retained origin, license, NOTICE/attribution and redistribution evidence.
+Use the [notices ledger](adoption/notices-ledger.md) to record obligations and
+missing inputs, not as a license clearance declaration. Include upstream-supplied
+generated code even when the build never invokes its generator. Source availability,
+module checksums, Apache-2.0 on the top-level project and upstream green metadata
+do not establish rights for transitive or extracted inputs. Unknown obligations
+keep rights closure unresolved and prevent B2/B6, dependent B7 and B8 from pass.
+Record independent verifier review of both the closure and shipped notices;
+retain superseded or contradictory evidence rather than silently choosing it.
 
 ## States, transitions and evidence loss
 
@@ -166,6 +228,9 @@ documentation contract, semantic acceptance and target mapping first.
 
 ## Synthetic report examples
 
+These historical synthetic `v0.8.0` examples are preserved from the generic
+contract. They are not a new pin, an owner-selected adoption tag or an adoption
+roster; the one-target shape below cannot satisfy the adoption wrapper.
 These examples are invented, unevaluated review records, not command transcripts,
 real artifacts, go-fabric support claims or test results. Artifact names below
 are symbolic. For a self-contained digest illustration, compute
@@ -204,7 +269,7 @@ from the assumed valid example; preserve other records and reopen dependents.
 
 | Variant | Required assessment |
 | --- | --- |
-| Release is missing/older than `v0.8.0`, or producer and verifier name different exact releases. | Reject the declaration or identity join; B7/B8 cannot pass. |
+| Historical generic release is missing/older than `v0.8.0`, or producer and verifier name different exact releases. | Reject the declaration or identity join; B7/B8 cannot pass. |
 | Target tuple changes, a required target child is missing, or a version label is the only claimed success. | Reopen or fail affected rows; no prior assessment or target support is inherited. |
 | Compile log belongs to source B while report and tests name A. | B4/B7 failed for identity mismatch; B8 failed. |
 | Producer says all rows passed but no verifier replay exists. | Claimed passes remain unverified; B8 unverified. |

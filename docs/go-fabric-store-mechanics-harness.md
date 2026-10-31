@@ -97,6 +97,36 @@ the retained-record budget.
 This intent is instance-local; it does not establish cross-process recovery or
 authorize any live fabric operation.
 
+## Adapter durability and retirement
+
+The [one-sensor reference](adoption/reference-bridge.md) uses this barrier model
+without treating MemoryStore as an SDK store. Write return, committed storage,
+confirmed completion and exposure are separate. Ambiguous writes and confirmed
+completions after stop stay unresolved until explicit reconciliation validates
+the original complete association. No automatic retry or replacement identity
+is safe. Read failure, nil snapshot, valid empty absence, corruption and conflict
+must remain distinct. An empty snapshot withholds exposure while retaining prior
+accepted records; it is not permission to reuse their slots.
+
+The [bridge candidate](contribution-candidates/bridge.md) retains retirement
+history. This store harness has no retirement/migration operation and proves no
+retired-slot reuse policy across processes. The planned adapter must retain
+reservations for retired keys throughout the node lifecycle, reject changed
+composition/binding/slot rather than silently reassign, and preserve unrelated
+records. Cross-process crash recovery requires authoritative durable evidence;
+a new in-memory instance cannot establish it. Source evidence and partial
+last-known-good semantic state remain with their existing owners.
+
+Two retained/reserved associations and two callbacks are partial fixture bounds.
+The integrated reference declares E=2/A=2/C=4/Q=2/F=1, D=8 logical drain steps,
+R=1 explicit recovery attempt per explicit start and a positive byte cap B.
+Here B bounds each record's node/capability/composition/binding/slot string sum;
+it is not a total SDK-store memory bound. Accepted, exposed, uncertain and
+pending maps, detached snapshots, external store internals and caller traces
+need separate accounting in the adapter. No boundedness claim covers
+uninstrumented SDK buffers. No implicit recovery loop is permitted; late cleanup
+after the deadline cannot clear the latched restart denial.
+
 ## Validation boundary
 
 Run discovery with `GO111MODULE=off go test ./qualification/storeharness -list .`

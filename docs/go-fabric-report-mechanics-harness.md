@@ -97,6 +97,32 @@ order. Alternatively cancel queued 2 and dispatched 1: 2 never reaches the sink;
 1 remains delivery-unknown even after a late success receipt. Neither schedule
 replays automatically or changes source freshness.
 
+## Adapter receipts and latest state
+
+The [reference bridge](adoption/reference-bridge.md) requires a real receipt
+observer independent of the submitting actor. Complete(identity, received) here
+accepts an injected fake-sink observation; an adapter echoing its own submission
+cannot establish controller receipt. The observer must name its boundary and
+match all seven identity axes: node, capability, composition, generation, token,
+sequence and native evidence reference. Binding/slot are separately validated
+association fields, not additional fields of this harness's receipt identity.
+
+SDK attribute updates may coalesce to latest state. Coalesced latest attributes
+are not a FIFO observation receipt and cannot satisfy the required per-observation
+row merely because the final value matches. Submit success, dispatch return,
+encoding success and controller receipt remain separate. If the real SDK cannot
+expose the declared receipt semantics, retain that row as missing/unverified;
+do not change the meaning of received to manufacture a pass.
+
+Q=2/F=1/B and retained-source accounting cover this harness only. The integrated
+reference additionally declares E=2/A=2/C=4, D=8 logical drain steps and R=1
+explicit recovery attempt. These are fixture budgets, not SDK or product limits.
+Adapter encoding buffers, subscriptions, retransmission queues, callback payloads
+and observer logs each need object/byte instrumentation and a positive cap.
+No boundedness claim covers uninstrumented SDK buffers. Callback cleanup after
+step-eight failure cannot clear the latched failure or permit a new generation.
+Native evidence and partial last-known-good state remain unchanged throughout.
+
 ## Focused evidence and remaining gates
 
 Run offline with worktree-local caches and disabled module/toolchain lookup:

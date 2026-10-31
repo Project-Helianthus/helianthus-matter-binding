@@ -7,6 +7,12 @@ and the separate reporting harness implement only synthetic mechanics.
 Nothing here is stable before Helianthus 1.0. Abstract event names below are
 fixture symbols, not upstream Go APIs or a new public interface.
 
+The [one-sensor reference bridge](adoption/reference-bridge.md) is the ordinary
+documentation companion under #62 / #59. Helianthus has selected go-fabric with
+its Matter 1.6.1 data model; the existing lock's 1.7-only targets are deferred.
+The lock and baseline have not been migrated by this document. SDK selection
+does not turn the proposed rows below into executed adapter evidence.
+
 ## Authority and current evidence
 
 The current [readiness evaluator](https://github.com/Project-Helianthus/helianthus-matter-binding/blob/main/runtime/production_readiness.py)
@@ -162,6 +168,55 @@ completion boundary, without guessing unsupported APIs.
 | Bounded exhaustion: fill E, A and C independently, then request one more of each; exercise Q, F and byte bounds through held callbacks. | Excess allocation or registration is explicitly rejected before side effects; F-full reports may enter only the bounded queue, otherwise are rejected. No counter exceeds its bound. Release barriers and retry explicitly. | Existing valid associations and accepted work survive; failed requests cannot consume slots permanently. | Separate boundary traces for every budget, byte accounting, failure reasons and resource recovery after drain. |
 | Fabric-store failure: inject read failure, failed write before commit, and ambiguous commit after recording the synthetic ledger association but before success callback. Also fail an unrelated synthetic store key. | Read failure blocks dependent start; failed/ambiguous write prevents new exposure. No blind retry or replacement identity; unrelated valid state is retained and only independently safe work may proceed. | No fabricated commissioned state, deletion of shared tokens or overwrite of committed state. Previously valid source and ledger records survive. | Fault position relative to commit, store operation trace, untouched-key sentinel, pre/post snapshots and bounded recovery attempts. |
 | Restart/recovery: restart after clean stop, failed write and ambiguous commit; for each, exercise valid, absent, corrupt and conflicting snapshot variants. Inject an old completion after recovery. | Only validated compatible durable records restore their original association. An ambiguous commit must be reconciled from storage before exposure; unresolved state remains withheld. No cached report automatically replays. | No guessed new identity, retired-slot reuse or old-generation mutation. Valid unaffected records and partial last-known-good evidence remain intact. | Crash-point snapshots, recovery decisions for every variant, old-callback trace and zero exposure before validation. |
+
+## Row-to-harness and adapter trace
+
+This ledger maps every required row above without marking any full runtime row
+passing. The linked source methods are current synthetic boundaries; the final
+column is required future adapter evidence, currently missing/unverified. A
+failed or timed-out retained run remains failed; an absent run remains missing.
+No combined adapter result is inferred from separate focused harness results.
+
+| Required row | Current source and focused test coverage | Missing planned adapter boundary |
+| --- | --- | --- |
+| Admission control | [Production evaluator](../runtime/production_readiness.py) and [readiness tests](../tests/test_production_readiness.py); commissioning `ProductionAllocations` is structural isolation only | Invoke actual evaluator with allocation spy; retain zero production allocation even after passing mechanics |
+| Deterministic requests | [Store](../qualification/storeharness/harness.go) Start/Begin validates supplied associations; [bridge](../candidates/bridge/candidate.go) Review checks history | Empty-ledger deterministic allocation, two request orders and reversed asynchronous completions; no current allocator |
+| Duplicate intent | Store Begin and [store tests](../qualification/storeharness/harness_test.go) TestPendingMismatchAndDetachedRead / TestBoundsAndDetachedState | Integrated intent deduplication before allocation, no duplicate waiters, conflict isolation |
+| Reordered and stale operations | Store Complete: TestCompletionEveryField / TestStaleRetryAndGeneration; [report](../qualification/reportharness/harness.go) Complete and [report tests](../qualification/reportharness/harness_test.go) TestReportHarnessIdentityFences | Cross-operation allocation/store/report schedules and exact one-time cleanup in SDK |
+| Late callbacks | [Commissioning](../qualification/commissioning/scenarios.go) Stop/Complete/Step and [tests](../qualification/commissioning/scenarios_test.go) TestDrainAndStaleGeneration / TestDrainDeadlinePermanentlyFencesRestart; report/store drain tests | Real callback registration lifetimes, stop fence, late resources and restart denial after D |
+| Queue backpressure | Report Submit/Dispatch/Counts/HighWater: TestReportHarnessFIFOAndBudgets / TestReportHarnessByteRejection | SDK queue/bytes including retransmission and encoding buffers, no silent coalescing of accepted observations |
+| Cancellation | Report Cancel/Complete: TestReportHarnessCancellation | Actual queued cancellation versus post-dispatch ambiguity and independently observed receipt; no guessed retraction |
+| Repeated start/stop | Report TestReportHarnessStopAndGeneration; commissioning ordered restart and drain tests; store TestStopDrainAndTimeout | Integrated three-cycle resource accounting, registrations and SDK quiescence; independent window close/revoke |
+| Bounded exhaustion | Report Q/F/B tests; store RecordLimit/CallbackLimit and TestBoundsAndDetachedState; commissioning one-pending rejection tests | E=2/A=2/C=4 measured independently in integrated adapter; harness maxima cannot be added to establish C |
+| Fabric-store failure | Store Start/Begin/Complete and TestStoreFaults / TestUnrelatedFaultAndConflictingRecovery | Actual durability/commit boundary, unchanged unrelated records, ambiguous success withheld, no automatic retry |
+| Restart/recovery | Store Reconcile/Start and TestRestartAfterEveryOutcome / TestRestartSnapshotMatrix; commissioning Restart restores only fake record | Authoritative crash snapshots, unresolved-write reconciliation, real fabric validation/CASE, retired-slot preservation |
+
+The independent identity obligations are K.Node, K.Capability and K.Composition;
+supplied Binding and Slot; Generation and Token; and report Sequence and Evidence.
+Report Complete compares its full Identity; store Complete additionally compares
+Association and Outcome; commissioning Complete compares Generation, Token and
+Node only. These distinct identities must not be conflated. The bridge review
+also retains Node/Owner/Profile/Capability history and Composition/Binding/Slot/
+Retired continuity; no-retired-slot reuse is not implemented by a store retirement
+API. Preserve every native source axis separately from completion identity.
+
+For integrated reference runs declare E=2/A=2/C=4/Q=2/F=1, D=8 logical drain
+steps, R=1 explicit recovery attempt per explicit start and B>0 bytes before
+execution. The [reference budget inventory](adoption/reference-bridge.md#fixture-budgets-and-ownership)
+distinguishes pending report bytes, retained per-key envelopes, record bytes,
+callback registrations and caller-owned traces. Existing commissioning owns one
+callback, store owns at most two, and report owns one flight, but this does not
+establish a global callback cap. Allocation and integrated accounting remain
+missing. No boundedness claim covers uninstrumented SDK buffers or producers.
+
+The [commissioning boundary](fabrictest-scenario-adapter.md#pase-case-and-window-completion)
+separates fake PASE from real CASE/commissioning completion and window close/revoke.
+The [receipt boundary](go-fabric-report-mechanics-harness.md#adapter-receipts-and-latest-state)
+requires actor-independent evidence: coalesced latest attributes are not a FIFO
+observation receipt. The [store boundary](go-fabric-store-mechanics-harness.md#adapter-durability-and-retirement)
+keeps ambiguous commits unresolved. Each harness latches drain failure at step
+eight; late cleanup cannot permit restart or erase that failure. Full teardown
+must include SDK tasks, registrations and hidden buffers as well as harness work.
 
 ## Evidence review and completion boundary
 

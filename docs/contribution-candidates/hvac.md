@@ -122,7 +122,7 @@ A read-derived command, including a setter for an effective target, is rejected
 by direction. No read result triggers a command or supports reversing a mapping.
 The existing reviewed lock and runtime fail-closed admission remain untouched.
 
-Before any target claim, reviewers still need the exact reviewed Matter 1.7
+Before any target claim, reviewers still need the exact selected Matter 1.6.1
 and go-fabric target definitions, compatible public docs-semantic mapping,
 actual matched device/cluster files and revisions, enum correspondence, units,
 scaling, nullability, feature applicability, all mandatory dependencies and
@@ -158,3 +158,28 @@ runtime integration, full CI, certification, interoperability, transport/device
 acceptance or physical/live-fabric smoke. No authorization gate is introduced;
 authentication/authorization remain 0.11 subjects. Ordinary independent review
 and applicable repository gates remain necessary; parent #24 stays open.
+
+## Reference factory and encoding order
+
+The [reference factory matrix](../adoption/reference-bridge.md#candidate-factory-validation-matrix-and-execution-order)
+places Thermostat/HVAC first after the one-sensor reference, before EEM and EPM.
+The adopted SDK direction uses Matter 1.6.1; the old lock's 1.7-only elements are
+deferred. No executable validator, pin or target revision changes here.
+
+A later encoder must inspect actual selected Thermostat definitions, temperature
+units/scales/ranges/null representation, capability feature closure and selected
+mode enum mapping. The local Celsius unit `C` and opaque mode labels are not
+encoded Matter values. Configured/manual/effective targets and measured-room
+observations remain separate; a read-only candidate cannot create a setter.
+
+Use the finite matrix's positive 21.5 C and complete codebook controls, nil versus
+zero, nonfinite observations, independently evidenced heating/cooling, all bounds,
+missing unselected mode entries and reviewed loss. Owner/Profile/Scope/Fact/Target
+can vary independently while other fields stay valid; Domain and Direction have
+only one accepted value, so alternate values are rejection/isolation controls,
+not valid distinct-key equality tests. Include all seven fields' completeness
+cases. Omitting any claimed field from the factory join must not alias siblings;
+removing its required-field check must reject the corresponding malformed case.
+These are reasoned future factory mutation targets, not newly executed tests.
+Preserve raw source evidence, qualification and partial last-known-good facts.
+Encoding, real SDK receipt/store/teardown and production admission remain separate.

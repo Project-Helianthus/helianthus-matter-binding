@@ -15,6 +15,50 @@ the general inventories or create protocol semantics. The public native catalog
 in SemReg [S], and accepted Matter mappings belong to the public semantic
 documentation owner identified by the binding lock, as described in [I].
 
+
+## Matter 1.6.1 target reconciliation
+
+The adopted SDK is [go-fabric](https://github.com/SukramJ/go-fabric) on
+**Matter 1.6.1**, as recorded in the [baseline](../SDK_BASELINE.md).
+The checked-in lock, validator, mapping reference and hosted job remain legacy
+Matter 1.7 artifacts pending owner-controlled replacement; they have not been
+migrated. Any lock metadata below describes that retained legacy state only.
+The [deferred ledger](../adoption/matter-161-deferred.md) separates Sensor
+Electrical Alarm and Power Topology ElectricalCircuit deferrals from the
+absent DEM PowerRangeAdjustment upstream snapshot gap.
+
+This table applies to every existing source row and target search on this page.
+**Changed** and **Unchanged** describe only the stated identity comparison;
+**Unknown** retains uninspected differences. Reported source presence is Proven
+only within the supplied graded inspection result, not independent replay here,
+full normative-corpus inspection, native qualification or an accepted join.
+Source qualification, direction, loss/withholding and incomplete mandatory
+closure remain independent and unchanged. No row is deleted or promoted. In retained row text, locked target rules
+mean unresolved requirements for the future reviewed adopted baseline, never
+authority to publish against the legacy 1.7 model.
+
+| Existing target references and row coverage | Adopted disposition and remaining evidence |
+| --- | --- |
+| P1–P9 pump/state/hours/starts/reset/kick and direct-boiler candidates | Unknown device/cluster/features and mandatory closure; retain all nine rows, circuit/solar/boiler provenance and no inferred control. |
+| Electrical Sensor / Power Topology / EPM fixture context; configuration and command roles | Changed Sensor/Topology to revision 1; unchanged EPM revision 3; no pump mapping or command effect follows. A generic actuator target remains Unknown. |
+
+For each candidate, obtain the retained Matter 1.6.1 normative device/cluster
+corpus and inspect the adopted SDK definitions, referenced features, attributes,
+commands, events, access, units, ranges, nullability and transitive mandatory
+composition. Public [upstream source](https://github.com/SukramJ/go-fabric/tree/main)
+locates the implementation; it does not supply the missing retained model corpus.
+Reconcile generated behavior and accepted public semantic target evidence with
+each native fact, direction, loss and falsifier. Do not substitute legacy
+connectedhomeip samples or the sole EVSE current mapping for another family.
+Actual lock migration and matching build/reporting evidence remain owner work.
+
+Descriptor and Power Topology composition, PowerMode, NumberOfMeasurementTypes,
+non-empty matching Accuracy and evidenced nullable ActivePower remain unresolved
+for the electrical route. No full normative corpus, Linux arm64 build, accepted
+production profile, conformance, certification or interoperability is established.
+Production admission remains denied. Native evidence and partial last-known-good
+state, eBUS MCP compatibility and GraphQL parity remain unchanged.
+
 ## Evidence and row identity
 
 **Proven** below means that the supplied public source establishes the stated
@@ -50,8 +94,8 @@ applicability condition, not sufficient proof of physical presence.
 
 **T?** in each row means the target device type/revision, cluster/revision,
 feature, attribute/command/event role and accepted public semantic mapping are
-all Unknown. The locked Matter 1.7 target corpus and mapping contents are not
-supplied. **M0** is the unresolved mandatory-feature closure procedure below;
+all Unknown. The adopted complete Matter 1.6.1 normative corpus and compatible mapping
+contents are not supplied. **M0** is the unresolved mandatory-feature closure procedure below;
 it applies separately to every row. No normative pump IDs are inferred from
 names, samples or the existing electrical fixture. Admission remains denied.
 
@@ -80,7 +124,7 @@ M0 is an explicit open ledger for each P row, not an invented mandatory list:
 
 | Required target evidence | Current gap for P1–P9 | Closure evidence required later |
 | --- | --- | --- |
-| Exact target tuple | Device, cluster, revisions and feature selection Unknown | Inspect the complete locked Matter 1.7 definitions and identify exact files/elements; names alone are insufficient |
+| Exact target tuple | Device, cluster, revisions and feature selection Unknown | Inspect the complete adopted Matter 1.6.1 definitions and identify exact files/elements; names alone are insufficient |
 | Mandatory and conditional composition | Requirement roster and feature applicability Unknown | Expand all unconditional and feature-dependent requirements, dependencies and composition until none remain unreviewed; record condition, applicability, source fact and dependent row |
 | Attribute/command/event contract | Access, units, scaling, ranges, nullability, unavailable states and reporting Unknown | Inspect locked requirements and an accepted public target mapping; match each required fact independently, including evidenced nullable representations |
 | Source coverage for those requirements | Cannot determine whether pump state or counters supply required target facts | Join qualified native/service evidence and exact SemReg roles to each requirement; leave unsupported facts withheld |
@@ -148,7 +192,7 @@ Acceptance for this slice is manual per-row source, meaning, identity, unit,
 loss, example and public-link review. It is not a prose-token test, native
 qualification, runtime integration, transport or physical/live-fabric PASS.
 Independent review, applicable hosted checks and parent acceptance remain
-separate. The missing locked target corpus, accepted target mappings, direct
+separate. The missing adopted normative target corpus, accepted target mappings, direct
 boiler source details, driver inspection and unresolved native semantics still
 block broader claims. No live test, commissioning, deployment or device write
 is performed or authorized by this inventory.

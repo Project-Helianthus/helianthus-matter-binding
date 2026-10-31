@@ -1,34 +1,52 @@
 # Matter SDK baseline and offline fixture
 
-## Evidence recorded by the lock
+## Adopted SDK and transition boundary
 
-The reviewed target is the public fork commit
-`29b4768a513cf566011ab8cd60df1bc495204953`. Its relevant Matter 1.7 source
-identities are fixed in `sdk/matter-sdk.lock.json`:
+Helianthus adopts [SukramJ/go-fabric](https://github.com/SukramJ/go-fabric)
+under Apache-2.0: a pure-Go semantic port of matter.js using the Matter **1.6.1**
+data model. This is the selected SDK direction now, not a future candidate or
+an implementation-readiness verdict. It is not certified. Public source links
+locate upstream material; no remote source was fetched for this reconciliation.
 
-| Artifact | Locked blob |
-| --- | --- |
-| `data_model/1.7/device_types/ElectricalSensor.xml` | `b6235fc64f44d4db2c42d05dc1e9b1f6f51dedfd` |
-| `data_model/1.7/clusters/ElectricalPowerMeasurement.xml` | `3349108215d56ad61a950a3ad874ea9773499cb5` |
-| `data_model/1.7/spec_sha` | `86ef3bbd871805600c751bd84c639cfb0af64ed9` |
-| `data_model/1.7/spec_tag` | `df6ffc2f98235eea1a41493e971ef53e69084425` |
-| generated Electrical Power Measurement `AttributeIds.h` | `8f95703c7a97c8c86752695446220a900819fd28` |
-| code-driven Electrical Sensor implementation | `3f937a355870efc38f512ee40a38007ca4cc6bd3` |
+The checked-in [lock](../sdk/matter-sdk.lock.json), validator and
+[hosted workflow](../.github/workflows/sdk-baseline.yml) remain **legacy**:
+they select the [connectedhomeip fork](https://github.com/AryaHassanli/connectedhomeip)
+and its Matter 1.7 target. The legacy semantic artifact remains at its
+[public owner](https://github.com/Project-Helianthus/helianthus-docs-semantic/blob/main/api/v1/targets/matter-1.7-ballot-0.9-v1.json).
+No dependency pin, workflow, runtime admission code or accepted semantic mapping
+is migrated by this documentation. Legacy evidence remains attributable to that
+implementation; it cannot qualify the adopted SDK.
 
-The upstream merge provenance is `project-chip/connectedhomeip#73842` at
-`bd73b5141729af92f3d021aeecaa53d9e0cadb89`. This documents identical accepted
-target data-model artifacts; it is not a build result for the fork target.
+## Bounded source presence, separate from qualification
 
-The mapping is bound to the public semantic repository main revision
-`30f5e5c79ac6da3a7c7c10c990599906d1dfd0cb`, path
-`api/v1/targets/matter-1.7-ballot-0.9-v1.json`, SHA-256
-`5ae81d5e0971d25ead08f982fdf31caf47ada4838d0ee6f2b3e719d11a6df39c`.
+The supplied graded source-inspection result supports the following identities.
+**Proven** here means reported source presence only; this worker did not rerun
+that inspection. Full normative requirements, feature applicability, mandatory
+composition, target mappings, generated behavior and build results remain
+**Unknown** unless separately evidenced. Public
+[go-fabric source](https://github.com/SukramJ/go-fabric/tree/main) is a locator,
+not retained normative-corpus evidence or independent replay.
 
-The locked target identifiers are Electrical Sensor `0x0510` revision 2, Power
-Topology `0x009C` revision 2, Electrical Power Measurement `0x0090` revision
-3, and optional `ActiveCurrent` `0x0005`.
+| Component | Legacy identity / prior inventory | Adopted source identity | Disposition and limit |
+| --- | --- | --- | --- |
+| Electrical Sensor `0x0510` | revision 2 in legacy lock | revision 1 | Changed; Electrical Alarm support deferred |
+| Power Topology `0x009C` | revision 2 in legacy lock | revision 1 | Changed; ElectricalCircuit deferred |
+| Electrical Power Measurement `0x0090` | revision 3 in legacy lock | revision 3 | Unchanged revision; features and composition still need evidence |
+| Electrical Energy Measurement | prior full identity Unknown | revision 2 | Unknown comparison; source presence does not accept energy mappings |
+| Thermostat | prior full identity Unknown | revision 11 | Unknown comparison; heating/cooling and command closure unresolved |
+| Device Energy Management (DEM) | prior full identity Unknown | revision 4 | Unknown comparison; PowerRangeAdjustment absent in inspected snapshot |
+| Energy EVSE | prior full identity Unknown | revision 4 | Unknown comparison; no current-limit or charging-state mapping accepted |
+| Aggregator | prior full identity Unknown | revision 2 | Unknown comparison; bridge composition remains unaccepted |
+| Bridged Node | prior full identity Unknown | revision 3 | Unknown comparison; Descriptor, identity and lifecycle closure unresolved |
 
-## Hosted reproduction
+These are not nine qualified targets. Sensor/Topology deferrals, the separate
+DEM snapshot gap and all uninspected differences are recorded in the
+[deferred ledger](adoption/matter-161-deferred.md). Every existing family and
+source row remains in the [full inventory](target-profile/inventory-completeness.md).
+The sole accepted mapping remains `evse.ac.current`, with optional
+`ActiveCurrent` `0x0005`; it supplies no complete endpoint composition.
+
+## Hosted reproduction — retained legacy procedure
 
 `.github/workflows/sdk-baseline.yml` clones the exact fork object into a clean
 Ubuntu runner, initializes recursive submodules, verifies detached HEAD and all
@@ -62,14 +80,14 @@ composition and controller interaction. It cannot qualify a Helianthus runtime,
 make a production profile accepted, prove a real fabric path, or establish
 Matter conformance or certification.
 
-The exact fork SHA had no own check run when this baseline was authored. Build
-success remains unproven until the hosted workflow runs successfully at the
-exact repository commit containing this lock.
+Legacy build success is not established by this documentation. The retained
+hosted procedure and any results apply only to the legacy lock, not go-fabric.
+No hosted, Linux arm64, platform or physical qualification was performed here.
 
 ## Production gate
 
-Electrical Sensor revision 2 requires Power Topology. Electrical Power
-Measurement revision 3 requires a non-unknown `PowerMode`, a positive
+The retained electrical readiness contract requires Descriptor and Power
+Topology composition. Electrical Power Measurement requires a non-unknown `PowerMode`, a positive
 `NumberOfMeasurementTypes`, non-empty fixed `Accuracy`, and a nullable
 `ActivePower` fact. The accepted mapping currently has only `evse.ac.current`.
 It cannot supply the missing facts by analogy or default.
@@ -82,8 +100,8 @@ reviewed revision may add an exact canonical-profile digest; only then would it
 require all of:
 
 - the unmodified lock;
-- exact-SHA build evidence whose five required targets are all `passed`;
-- an `accepted` composition profile matching the lock and mapping revision;
+- matching independently verified SDK build and fixture evidence;
+- an `accepted` composition profile matching the reviewed lock and accepted mapping;
 - evidenced Descriptor, Power Topology, and Electrical Power Measurement facts.
 
 [`examples/runtime-composition.profile.json`](../examples/runtime-composition.profile.json)
@@ -91,3 +109,11 @@ is intentionally a `proposed` template with missing evidence. It documents the
 required shape but cannot pass the gate even if a caller changes its status. The
 admissible closure options are to extend accepted evidence, select an
 evidence-backed standards-valid target, or withhold the existing mapping.
+
+The adopted source identities above do not relax this boundary. The complete
+retained normative model corpus, accepted semantic target evidence and actual
+lock migration remain external provisioning/owner work. Source inspection,
+legacy sample success and documentation checks establish neither Matter
+conformance nor certification, interoperability, arm64 behavior or production
+admission. Native evidence and partial last-known-good state remain preserved;
+eBUS MCP compatibility and GraphQL parity are unchanged.

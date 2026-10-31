@@ -80,6 +80,35 @@ capabilities remain Unknown. No guessed signature or passing fake may qualify
 fabrictest. Unobservable release, hidden buffering or unbounded shutdown blocks
 qualification. Retain rejected and timeout traces alongside successes.
 
+## PASE, CASE and window completion
+
+The [one-sensor reference](adoption/reference-bridge.md) and
+[runtime row ledger](go-fabric-runtime-qualification.md#row-to-harness-and-adapter-trace)
+place this partial model inside the planned adapter. Its `paired` state records
+only injected PASE success. `commissioned` records the fake close/discovery
+sequence, not operational commissioning or a validated CASE session. A future
+adapter must observe PASE completion, operational commissioning completion and
+matching CASE communication independently; cached discovery or Restart success
+flags are not substitutes for validated fabric state.
+
+Window close and revoke are distinct boundaries to trace in a real adapter.
+OpenWindow(false) supplies a fake close acknowledgement only. There is no revoke
+port or cancellation guarantee in this runner. A failed close leaves the window
+open and Stop rejects it; it does not silently revoke or discard callbacks.
+Before real teardown can be accepted, show actual close/revoke acknowledgement,
+old-window callback fencing and registration release. Missing observations stay
+Unknown. At D=8 logical steps with a callback outstanding, failure stays latched
+even when matching cleanup arrives later; restart remains denied.
+
+The integrated reference declares E=2/A=2/C=4/Q=2/F=1, R=1 explicit recovery
+attempt, D=8 logical steps and a positive declared byte cap. Here there is only
+one pending callback, a 32-byte node-symbol cap and a two-record discovery input
+limit. They are fixture budgets, not product capacity or a bound on external/SDK
+buffers. The caller must account for every copied input and retained trace.
+Actual allocation, durable store reconciliation, CASE and integrated callback
+budgets remain unverified. The structural zero-allocation method must be paired
+with the separate actual-evaluator denial control before adapter qualification.
+
 ## Evidence and remaining acceptance
 
 The [tests](https://github.com/Project-Helianthus/helianthus-matter-binding/blob/main/qualification/commissioning/scenarios_test.go)
