@@ -95,12 +95,19 @@ are not comparable, because module zips apply their own file-selection rules.
 **4. Verify separately.** A verifier repeats steps 1–3 in a clean environment and
 records its own results. Producer results alone remain unverified.
 
-**5. Replay offline.** Using a copy of the retained cache:
+**5. Replay offline.** No module file exists in the repository at this point, so
+`go mod verify` has nothing to run against. Create a disposable verification
+module in a scratch directory outside the repository. It requires the exact
+selected tag and carries the retained `go.sum` lines. Using a copy of the
+retained cache, run from that directory:
 
 ```sh
 GOWORK=off GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOFLAGS=-mod=readonly \
 GOMODCACHE="$BUNDLE_COPY/modcache" GOCACHE="$WORK/gocache" go mod verify
 ```
+
+If the disposable module cannot be created or `go mod verify` reports a missing
+module file, the replay is unverified; stop and retain the error.
 
 `go mod verify` checks cache consistency only. The `go.sum` and lock comparison
 below is what binds the cache to the pinned identity.
