@@ -21,6 +21,16 @@ jobs:
         run: |
           python3 tools/validate_lock.py
           python3 -m unittest discover -s tests -v
+      - name: Run Go test suites
+        run: |
+          packages=()
+          while IFS= read -r dir; do
+            packages+=("$dir")
+          done < <(find . -name .git -prune -o -name '*.go' -print0 | xargs -0 -n1 dirname | sort -u)
+          echo "Go packages:"
+          printf '%s\n' "${packages[@]}"
+          test "${#packages[@]}" -gt 0
+          GO111MODULE=off go test -race -count=1 "${packages[@]}"
       - name: Install public Linux build prerequisites
         run: |
           sudo apt-get update
