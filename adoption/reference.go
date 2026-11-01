@@ -21,6 +21,9 @@ const (
 	// CurrentUnit is the projected unit. Unit conversion belongs to the
 	// projection port; the host never converts.
 	CurrentUnit = "mA"
+	// CurrentMeasurementType is the measurement type the host reports, so the
+	// supplied Accuracy list must carry an entry for it.
+	CurrentMeasurementType = "ActiveCurrent"
 
 	syntheticSource  = "synthetic-fixture"
 	syntheticRefHead = "synthetic:"
@@ -525,6 +528,9 @@ func (m SyntheticMetadata) validate() error {
 			return fmt.Errorf("%w: Accuracy", ErrProvenance)
 		}
 		seen[entry.MeasurementType] = true
+	}
+	if !seen[CurrentMeasurementType] {
+		return fmt.Errorf("%w: no %s entry", ErrAccuracy, CurrentMeasurementType)
 	}
 	if !m.ActivePower.Declared || (m.ActivePower.Null && m.ActivePower.Milliwatts != 0) {
 		return ErrActivePower

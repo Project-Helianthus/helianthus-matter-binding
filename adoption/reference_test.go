@@ -368,6 +368,15 @@ func TestAA09InvalidContextReachesNoPort(t *testing.T) {
 			c.Metadata.MeasurementTypes.Value = 2
 			c.Metadata.Accuracy = append(c.Metadata.Accuracy, c.Metadata.Accuracy[0])
 		}, ErrAccuracy},
+		// The host reports ActiveCurrent, so its Accuracy entry cannot be absent.
+		{"accuracy active current replaced", func(c *FixtureContext) { c.Metadata.Accuracy[0].MeasurementType = "ActivePower" }, ErrAccuracy},
+		{"accuracy active current missing", func(c *FixtureContext) {
+			c.Metadata.Accuracy[0] = AccuracyFact{
+				MeasurementType: "ActivePower", Measured: true, MinMeasured: -9, MaxMeasured: 9, FixedMax: 1,
+				Provenance: SyntheticProvenance("accuracy-2"),
+			}
+		}, ErrAccuracy},
+		{"accuracy active current case", func(c *FixtureContext) { c.Metadata.Accuracy[0].MeasurementType = "activecurrent" }, ErrAccuracy},
 		// ActivePower: undeclared differs from declared null and known zero.
 		{"active power undeclared", func(c *FixtureContext) { c.Metadata.ActivePower.Declared = false }, ErrActivePower},
 		{"active power absent fact", func(c *FixtureContext) { c.Metadata.ActivePower = ActivePowerFact{} }, ErrActivePower},
