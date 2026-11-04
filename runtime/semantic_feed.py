@@ -188,6 +188,18 @@ def _uint64(value: Any) -> int:
     return int(value)
 
 
+def _int64(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        raise _Malformed("malformed time member")
+    if isinstance(value, str):
+        if re.fullmatch(r"-?(0|[1-9][0-9]{0,18})", value) is None:
+            raise _Malformed("malformed time member")
+        value = int(value)
+    if not -(1 << 63) <= value < (1 << 63):
+        raise _Malformed("malformed time member")
+    return value
+
+
 def _list(value: Any, limit: int) -> list[Any]:
     if not isinstance(value, list) or len(value) > limit:
         raise _Malformed("malformed or oversized list")
@@ -226,7 +238,7 @@ def _value(raw: Any) -> Mapping[str, Any]:
     """Validate the structure a published value must have for its declared kind."""
     value = _object(raw)
     kind = value.get("kind")
-    if kind not in _VALUE_KINDS:
+    if not isinstance(kind, str) or kind not in _VALUE_KINDS:
         raise _Malformed("unknown value kind")
     member = value.get(kind)
     if kind == "quantity":
@@ -251,8 +263,12 @@ def _value(raw: Any) -> Mapping[str, Any]:
             _symbol(item)
     else:
         time_value = _object(member)
-        if time_value.get("unixNanoseconds") is None:
-            raise _Malformed("malformed time value")
+        _int64(time_value.get("unixNanoseconds"))
+        if time_value.get("clockId") is not None:
+            _text(time_value.get("clockId"))
+        uncertainty = time_value.get("uncertaintyNs")
+        if uncertainty is not None and _int64(uncertainty) < 0:
+            raise _Malformed("malformed time uncertainty")
     return value
 
 
@@ -278,7 +294,7 @@ def _parse_asset(raw: Any) -> AssetState:
     reason = record.get("unavailableReason")
     snapshot, projection = record.get("snapshot"), record.get("projection")
     if reason is not None:
-        if reason not in UNAVAILABLE_REASONS or snapshot is not None or projection is not None:
+        if not isinstance(reason, str) or reason not in UNAVAILABLE_REASONS or snapshot is not None or projection is not None:
             raise _Malformed("unavailable asset carries state or an unknown reason")
         return AssetState(asset_id, None, None, (), (), reason)
     snapshot, projection = _object(snapshot), _object(projection)
@@ -302,14 +318,14 @@ def _parse_asset(raw: Any) -> AssetState:
     for disposition in _list(projection.get("dispositions"), MAX_DISPOSITIONS):
         disposition = _object(disposition)
         kind, item_id, outcome = disposition.get("kind"), _text(disposition.get("itemId")), disposition.get("outcome")
-        if kind not in ITEM_KINDS or outcome not in OUTCOMES or (kind, item_id) in seen:
+        if not isinstance(kind, str) or not isinstance(outcome, str) or kind not in ITEM_KINDS or outcome not in OUTCOMES or (kind, item_id) in seen:
             raise _Malformed("unknown or duplicate disposition")
         seen.add((kind, item_id))
         losses = []
         for loss in _list(disposition.get("loss"), MAX_LOSS):
             loss = _object(loss)
             description = loss.get("description")
-            if loss.get("kind") not in LOSS_KINDS or not isinstance(loss.get("reversible"), bool) or not isinstance(description, str) or len(description) > MAX_DESCRIPTION:
+            if not isinstance(loss.get("kind"), str) or loss.get("kind") not in LOSS_KINDS or not isinstance(loss.get("reversible"), bool) or not isinstance(description, str) or len(description) > MAX_DESCRIPTION:
                 raise _Malformed("malformed loss detail")
             sources = tuple(_text(item) for item in _list(loss.get("sourceItems"), MAX_LOSS))
             losses.append(Loss(loss["kind"], sources, description, loss["reversible"]))

@@ -391,6 +391,14 @@ class SemanticFeedTest(unittest.TestCase):
             "invalid quantity coefficient": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), quantity("not-a-number")),
             "quantity without number": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), {**quantity("1"), "quantity": {"unit": "unit.synthetic.watt"}}),
             "unknown value kind": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), {**quantity("1"), "kind": "blob"}),
+            "list value kind": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), {**quantity("1"), "kind": []}),
+            "list disposition kind": mutate(("projection", "dispositions"), [{**capability(POWER), "kind": []}]),
+            "dict disposition outcome": mutate(("projection", "dispositions"), [capability(POWER, {})]),
+            "list loss kind": mutate(("projection", "dispositions"), [capability(POWER, "transformed", None, [{"kind": [], "sourceItems": [], "description": "", "reversible": True}])]),
+            "list unavailable reason": unavailable(ASSET_A, []),
+            "time with text instant": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), {"kind": "time", "time": {"unixNanoseconds": "not-a-time"}}),
+            "time with list clock": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), {"kind": "time", "time": {"unixNanoseconds": "1", "clockId": []}}),
+            "time with negative uncertainty": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), {"kind": "time", "time": {"unixNanoseconds": "1", "uncertaintyNs": "-5"}}),
             "oversized facts": mutate(("snapshot", "facts"), [{"revision": "1", "key": {}, "candidates": []}] * 4097),
         }
         for label, record in cases.items():
