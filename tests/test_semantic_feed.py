@@ -11,6 +11,7 @@ import copy
 import json
 import socket
 import threading
+import time
 import unittest
 from pathlib import Path
 from typing import Any
@@ -386,6 +387,10 @@ class SemanticFeedTest(unittest.TestCase):
             "missing snapshot": mutate(("snapshot",), None),
             "unknown unavailable reason": unavailable(ASSET_A, "semantic.read.reason.anything"),
             "unavailable with state": {**asset(ASSET_A, revisions(9)), "unavailableReason": "semantic.read.reason.asset_unknown"},
+            "empty fact key": mutate(("snapshot", "facts"), [{"revision": "9", "key": {}, "candidates": []}]),
+            "invalid quantity coefficient": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), quantity("not-a-number")),
+            "quantity without number": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), {**quantity("1"), "quantity": {"unit": "unit.synthetic.watt"}}),
+            "unknown value kind": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), {**quantity("1"), "kind": "blob"}),
             "oversized facts": mutate(("snapshot", "facts"), [{"revision": "1", "key": {}, "candidates": []}] * 4097),
         }
         for label, record in cases.items():
@@ -467,6 +472,29 @@ class SemanticFeedTest(unittest.TestCase):
         client = FakeClient(TransportError("a"), result(asset(ASSET_A), asset(ASSET_B)))
         feed = SemanticFeed(client, [ASSET_A, ASSET_B], backoff_s=(0.0,))
         self.assertTrue(feed.refresh(self.cancel).current)
+
+    def test_default_wait_is_cancellable_without_a_wait_method(self) -> None:
+        class PollToken:
+            def __init__(self, set_after: int | None = None) -> None:
+                self.polls, self.set_after = 0, set_after
+
+            def is_set(self) -> bool:
+                self.polls += 1
+                return self.set_after is not None and self.polls > self.set_after
+
+        started = time.monotonic()
+        client = FakeClient(TransportError("a"), result(asset(ASSET_A), asset(ASSET_B)))
+        feed = SemanticFeed(client, [ASSET_A, ASSET_B], backoff_s=(0.2,))
+        self.assertTrue(feed.refresh(PollToken()).current)
+        self.assertGreaterEqual(time.monotonic() - started, 0.15)
+
+        client = FakeClient(TransportError("a"), result(asset(ASSET_A), asset(ASSET_B)))
+        feed = SemanticFeed(client, [ASSET_A, ASSET_B], backoff_s=(30.0,))
+        started = time.monotonic()
+        with self.assertRaises(Cancelled):
+            feed.refresh(PollToken(set_after=2))
+        self.assertLess(time.monotonic() - started, 5.0)
+        self.assertEqual(client.reconnects, [])
 
     def test_construction_bounds(self) -> None:
         client = FakeClient()

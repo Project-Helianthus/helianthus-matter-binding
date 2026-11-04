@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Protocol
 
@@ -55,6 +56,11 @@ QUERY = (
 
 _UINT64 = re.compile(r"0|[1-9][0-9]{0,19}")
 _UINT64_MAX = (1 << 64) - 1
+_COEFFICIENT = re.compile(r"-?(0|[1-9][0-9]{0,38})")
+_VALUE_KINDS = frozenset({"quantity", "boolean", "text", "symbol", "symbols", "time"})
+MAX_DIMENSIONS = 64
+MAX_EXPONENT10 = 1000
+_WAIT_POLL_S = 0.05
 _EXHAUSTED = object()
 
 
@@ -208,6 +214,59 @@ def _canonical(value: Any) -> str:
         raise _Malformed("value is not representable") from error
 
 
+def _symbol(raw: Any) -> None:
+    symbol = _object(raw)
+    _text(symbol.get("namespace"))
+    _text(symbol.get("token"))
+    if not isinstance(symbol.get("known"), bool):
+        raise _Malformed("malformed symbol")
+
+
+def _value(raw: Any) -> Mapping[str, Any]:
+    """Validate the structure a published value must have for its declared kind."""
+    value = _object(raw)
+    kind = value.get("kind")
+    if kind not in _VALUE_KINDS:
+        raise _Malformed("unknown value kind")
+    member = value.get(kind)
+    if kind == "quantity":
+        quantity = _object(member)
+        number = _object(quantity.get("number"))
+        coefficient, exponent = number.get("coefficient"), number.get("exponent10")
+        if not isinstance(coefficient, str) or _COEFFICIENT.fullmatch(coefficient) is None:
+            raise _Malformed("malformed quantity coefficient")
+        if not isinstance(exponent, int) or isinstance(exponent, bool) or abs(exponent) > MAX_EXPONENT10:
+            raise _Malformed("malformed quantity exponent")
+        _text(quantity.get("unit"))
+    elif kind == "boolean":
+        if not isinstance(member, bool):
+            raise _Malformed("malformed boolean value")
+    elif kind == "text":
+        if not isinstance(member, str) or len(member) > MAX_DESCRIPTION:
+            raise _Malformed("malformed text value")
+    elif kind == "symbol":
+        _symbol(member)
+    elif kind == "symbols":
+        for item in _list(member, MAX_CANDIDATES):
+            _symbol(item)
+    else:
+        time_value = _object(member)
+        if time_value.get("unixNanoseconds") is None:
+            raise _Malformed("malformed time value")
+    return value
+
+
+def _fact_key(raw: Any) -> str:
+    key = _object(raw)
+    for member in ("packId", "packVersion", "factId"):
+        _text(key.get(member))
+    for dimension in _list(key.get("dimensions"), MAX_DIMENSIONS):
+        dimension = _object(dimension)
+        _text(dimension.get("id"))
+        _value(dimension.get("value"))
+    return _canonical(key)
+
+
 def _revisions(record: Mapping[str, Any]) -> Revisions:
     raw = _object(record.get("revisions"))
     return Revisions(**{axis: _uint64(raw.get(axis)) for axis in REVISION_AXES})
@@ -235,8 +294,8 @@ def _parse_asset(raw: Any) -> AssetState:
         for candidate in _list(envelope.get("candidates"), MAX_CANDIDATES):
             candidate = _object(candidate)
             value = candidate.get("value")
-            candidates.append(Candidate(_text(candidate.get("candidateId")), _uint64(candidate.get("revision")), None if value is None else _canonical(_object(value))))
-        facts.append(Fact(_canonical(_object(envelope.get("key"))), _uint64(envelope.get("revision")), tuple(candidates)))
+            candidates.append(Candidate(_text(candidate.get("candidateId")), _uint64(candidate.get("revision")), None if value is None else _canonical(_value(value))))
+        facts.append(Fact(_fact_key(envelope.get("key")), _uint64(envelope.get("revision")), tuple(candidates)))
 
     dispositions = []
     seen: set[tuple[str, str]] = set()
@@ -440,8 +499,14 @@ class SemanticFeed:
 
 
 def _wait(seconds: float, cancel: CancelToken) -> bool:
-    """Wait on a token that supports it; otherwise retry immediately within the attempt bound."""
+    """Wait for the backoff; return False when the token cancelled it."""
     waiter = getattr(cancel, "wait", None)
     if callable(waiter):
         return not waiter(seconds)
-    return not cancel.is_set()
+    deadline = time.monotonic() + seconds
+    while not cancel.is_set():
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return True
+        time.sleep(min(remaining, _WAIT_POLL_S))
+    return False
