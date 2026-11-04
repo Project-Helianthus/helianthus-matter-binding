@@ -399,6 +399,8 @@ class SemanticFeedTest(unittest.TestCase):
             "time with text instant": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), {"kind": "time", "time": {"unixNanoseconds": "not-a-time"}}),
             "time with list clock": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), {"kind": "time", "time": {"unixNanoseconds": "1", "clockId": []}}),
             "time with negative uncertainty": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), {"kind": "time", "time": {"unixNanoseconds": "1", "uncertaintyNs": "-5"}}),
+            "duplicate fact key": mutate(("snapshot", "facts"), asset(ASSET_A)["snapshot"]["facts"] * 2),
+            "duplicate candidate id": mutate(("snapshot", "facts", 0, "candidates"), asset(ASSET_A)["snapshot"]["facts"][0]["candidates"] * 2),
             "oversized facts": mutate(("snapshot", "facts"), [{"revision": "1", "key": {}, "candidates": []}] * 4097),
         }
         for label, record in cases.items():
@@ -414,6 +416,14 @@ class SemanticFeedTest(unittest.TestCase):
                 before = feed.state()
                 feed.refresh(self.cancel)
                 self.assert_retained(feed, before)
+
+    def test_selection_keys_stay_distinct_for_slash_bearing_identities(self) -> None:
+        first, second = "asset:a", "asset:a/b"
+        feed = self.feed(FakeClient(result(asset(first, dispositions=[capability("b/c")]), asset(second, dispositions=[capability("c")]))), (first, second))
+        feed.refresh(self.cancel)
+        names = [o.capability for o in feed.selection_input().offers]
+        self.assertEqual(len(names), 2)
+        self.assertEqual(len(set(names)), 2, names)
 
     def test_cancellation_before_during_and_after_a_read_discards_the_result(self) -> None:
         self.cancel.set()

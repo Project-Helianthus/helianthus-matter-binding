@@ -311,7 +311,11 @@ def _parse_asset(raw: Any) -> AssetState:
             candidate = _object(candidate)
             value = candidate.get("value")
             candidates.append(Candidate(_text(candidate.get("candidateId")), _uint64(candidate.get("revision")), None if value is None else _canonical(_value(value))))
+        if len({candidate.candidate_id for candidate in candidates}) != len(candidates):
+            raise _Malformed("duplicate candidate identity")
         facts.append(Fact(_fact_key(envelope.get("key")), _uint64(envelope.get("revision")), tuple(candidates)))
+    if len({fact.key for fact in facts}) != len(facts):
+        raise _Malformed("duplicate fact key")
 
     dispositions = []
     seen: set[tuple[str, str]] = set()
@@ -496,7 +500,7 @@ class SemanticFeed:
             for disposition in asset.dispositions:
                 if disposition.kind != "capability":
                     continue
-                capability = f"{asset.asset_id}/{disposition.item_id}"
+                capability = f"{_escape(asset.asset_id)}/{_escape(disposition.item_id)}"
                 reasons = list(feed_reasons)
                 if len(capability) > MAX_TEXT:
                     reasons.append("capability name exceeds the selection bound")
@@ -512,6 +516,11 @@ class SemanticFeed:
                     assert asset.snapshot_id is not None and asset.revisions is not None
                     offers.append(Offer(capability, asset.asset_id, disposition.item_id, asset.snapshot_id, asset.revisions))
         return SelectionInput(tuple(offers), tuple(withheld))
+
+
+def _escape(part: str) -> str:
+    """Encode one selection-key component so the joining slash stays unambiguous."""
+    return part.replace("%", "%25").replace("/", "%2F")
 
 
 def _wait(seconds: float, cancel: CancelToken) -> bool:
