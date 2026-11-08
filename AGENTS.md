@@ -27,11 +27,33 @@ python3 tools/validate_lock.py
 python3 -m unittest discover -s tests -v
 ```
 
-The hosted workflow performs the exact-SHA recursive SDK checkout, checks its
-tracked blobs, builds `all-devices-app` and `chip-tool`, runs focused Electrical
-Power Measurement and Power Topology tests, then runs the bounded upstream
-Electrical Sensor controller fixture. These commands require a Linux runner and
-are intentionally not a requirement for local contributors.
+The hosted workflow validates both Go module configurations with workspace mode
+disabled. Run the same adapter checks from the module root:
+
+```bash
+export GOWORK=off GO111MODULE=on
+go vet ./...
+go test -race -count=1 -timeout=5m ./...
+go vet -tags gofabric ./...
+go test -race -tags gofabric -count=1 -timeout=5m ./...
+```
+
+The `gofabric` tag selects the adopted Go adapter and its SDK-backed tests.
+The tagged whole-module test command executes the adapter tests; a command such
+as `go test -tags gofabric -c ./sdkfabric` only compiles a test executable and
+provides no executed-test evidence. Tagged discovery and commissioning tests
+require a separately authorized environment; restricted offline validation must
+compile them and execute only tests verified to use in-memory operations without
+discovery or sockets. See [build qualification](docs/go-fabric-build-qualification.md)
+for the evidence boundary. Hosted full tagged execution remains required;
+compilation or static workflow tests do not establish hosted success.
+
+Separately, the retained legacy SDK steps perform the recursive locked checkout,
+check tracked blobs, build `all-devices-app` and `chip-tool`, run focused Electrical
+Power Measurement and Power Topology tests, and run the bounded upstream
+Electrical Sensor controller fixture. These Linux-runner checks provide legacy
+SDK evidence, not adopted Go adapter qualification. Neither suite establishes
+production admission, interoperability or certification.
 
 Documentation is required for changed public ownership, Matter target semantics,
 readiness rules, fixtures, or safety boundaries. This repository has no declared
