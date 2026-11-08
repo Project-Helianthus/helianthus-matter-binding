@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import sys
 import tempfile
 import unittest
@@ -12,7 +13,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 from validate_lock import validate_workflow_pins  # noqa: E402
 
-SHA = "11d5960a326750d5838078e36cf38b85af677262"
+SHA = hashlib.sha1(b"synthetic immutable action reference").hexdigest()
 
 
 def check(*uses_lines: str) -> list[str]:
@@ -26,6 +27,21 @@ def check(*uses_lines: str) -> list[str]:
 class WorkflowPinTest(unittest.TestCase):
     def test_repository_workflows_are_pinned(self) -> None:
         self.assertEqual(validate_workflow_pins(ROOT / ".github" / "workflows"), [])
+
+    def test_legacy_sdk_checks_remain_separate(self) -> None:
+        workflow = (ROOT / ".github/workflows/sdk-baseline.yml").read_text()
+        self.assertTrue(workflow.startswith("name: Matter Go adapter and legacy SDK validation\n"))
+        for command in (
+            'scripts/checkout_sdk.sh "$RUNNER_TEMP/connectedhomeip"',
+            "source scripts/bootstrap.sh",
+            "./scripts/build/build_examples.py --target linux-x64-all-devices-clang build",
+            "./scripts/build/build_examples.py --target linux-x64-chip-tool-clang build",
+            "out/focused-tests/tests/TestElectricalPowerMeasurementCluster",
+            "out/focused-tests/tests/TestPowerTopologyCluster",
+            'scripts/run_upstream_fixture.sh "$RUNNER_TEMP/connectedhomeip"',
+        ):
+            with self.subTest(command=command):
+                self.assertIn(command, workflow)
 
     def test_sha_pin_with_version_comment_passes(self) -> None:
         self.assertEqual(check(f"- uses: actions/checkout@{SHA} # v4.4.0"), [])

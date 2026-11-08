@@ -1,4 +1,4 @@
-name: Matter SDK baseline
+name: Matter Go adapter and legacy SDK validation
 
 on:
   pull_request:
@@ -21,16 +21,15 @@ jobs:
         run: |
           python3 tools/validate_lock.py
           python3 -m unittest discover -s tests -v
-      - name: Run Go test suites
+      - name: Vet and test the adopted Go adapter in module mode
+        env:
+          GOWORK: "off"
+          GO111MODULE: "on"
         run: |
-          packages=()
-          while IFS= read -r dir; do
-            packages+=("$dir")
-          done < <(find . -name .git -prune -o -name '*.go' -print0 | xargs -0 -n1 dirname | sort -u)
-          echo "Go packages:"
-          printf '%s\n' "${packages[@]}"
-          test "${#packages[@]}" -gt 0
-          GO111MODULE=off go test -race -count=1 "${packages[@]}"
+          go vet ./...
+          go test -race -count=1 -timeout=5m ./...
+          go vet -tags gofabric ./...
+          go test -race -tags gofabric -count=1 -timeout=5m ./...
       - name: Install public Linux build prerequisites
         run: |
           sudo apt-get update
