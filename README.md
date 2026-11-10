@@ -35,9 +35,9 @@ before Helianthus 1.0.
 
 ## Upstream engagement
 
-Board decision, 2026-11-08, audit report §8 decision 10 and §8.1:
+Evidence class: **Unknown**. Status: **candidate**. Provenance is not published.
 
-> Upstream engagement **only if SukramJ invites it** after seeing the fork and its reasons (Board 2026-11-08): then register Helianthus as the second consumer (reinstates the suspended deprecation window) and offer the fork PRs upstream under the CLA, each with the Board's OK. Until then no contact, no upstream issue or PR.
+> Upstream engagement **only if the upstream maintainer invites it** after seeing the fork and its reasons: then register Helianthus as the second consumer (reinstates the suspended deprecation window) and offer the fork PRs upstream under the CLA, each with the Board's OK. Until then no contact, no upstream issue or PR.
 
 The existing [contribution workflow](docs/adoption/upstream-contribution-workflow.md)
 describes SDK consumption, local investigation and contributor rights separately;
