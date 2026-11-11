@@ -1,6 +1,6 @@
 """Bounded consumer of the Gateway GraphQL semantic snapshot feed.
 
-The feed reads the `semanticSnapshot(assetIds:)` root field through an injected,
+The feed reads the `semantic_snapshot(asset_ids:)` root field through an injected,
 already authenticated client. This module opens no connection, performs no HTTP,
 applies no authentication policy, and creates no Matter node, endpoint, fabric,
 or commissioning state. It retains the exact snapshot identity, revision vector,
@@ -42,16 +42,16 @@ OUTCOMES = frozenset({"exact", "transformed", "withheld", "unrepresentable", "un
 ITEM_KINDS = frozenset({"fact", "relation", "capability", "operation"})
 LOSS_KINDS = frozenset({"unit", "range", "precision", "time", "symbol", "provenance", "identity", "capability", "operation", "policy"})
 
-_VALUE = "kind quantity { number { coefficient exponent10 } unit } boolean text symbol { namespace token known } symbols { namespace token known } time { unixNanoseconds clockId uncertaintyNs }"
-_KEY = "packId packVersion factId dimensions { id value { " + _VALUE + " } }"
+_VALUE = "kind quantity { number { coefficient exponent10 } unit } boolean text symbol { namespace token known } symbols { namespace token known } time { unix_nanoseconds clock_id uncertainty_ns }"
+_KEY = "pack_id pack_version fact_id dimensions { id value { " + _VALUE + " } }"
 _REVISIONS = "revisions { " + " ".join(REVISION_AXES) + " }"
 QUERY = (
-    "query SemanticFeed($assetIds: [ID!]!) { semanticSnapshot(assetIds: $assetIds) { assets { "
-    "assetId unavailableReason "
-    "snapshot { snapshotId " + _REVISIONS + " facts { revision key { " + _KEY + " } "
-    "candidates { candidateId revision value { " + _VALUE + " } } } } "
-    "projection { snapshotId " + _REVISIONS + " dispositions { kind itemId outcome reason "
-    "loss { kind sourceItems description reversible } } } } } }"
+    "query SemanticFeed($asset_ids: [ID!]!) { semantic_snapshot(asset_ids: $asset_ids) { assets { "
+    "asset_id unavailable_reason "
+    "snapshot { snapshot_id " + _REVISIONS + " facts { revision key { " + _KEY + " } "
+    "candidates { candidate_id revision value { " + _VALUE + " } } } } "
+    "projection { snapshot_id " + _REVISIONS + " dispositions { kind item_id outcome reason "
+    "loss { kind source_items description reversible } } } } } }"
 )
 
 _UINT64 = re.compile(r"0|[1-9][0-9]{0,19}")
@@ -206,9 +206,14 @@ def _list(value: Any, limit: int) -> list[Any]:
     return value
 
 
+_RETIRED_MEMBERS = frozenset(('semanticSnapshot', 'assetIds', 'assetId', 'snapshotId', 'packId', 'packVersion', 'factId', 'candidateId', 'itemId', 'sourceItems', 'unavailableReason', 'unixNanoseconds', 'clockId', 'uncertaintyNs'))
+
+
 def _object(value: Any) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise _Malformed("malformed object")
+    if _RETIRED_MEMBERS.intersection(value):
+        raise _Malformed("retired contract member")
     return value
 
 
@@ -263,10 +268,10 @@ def _value(raw: Any) -> Mapping[str, Any]:
             _symbol(item)
     else:
         time_value = _object(member)
-        _int64(time_value.get("unixNanoseconds"))
-        if time_value.get("clockId") is not None:
-            _text(time_value.get("clockId"))
-        uncertainty = time_value.get("uncertaintyNs")
+        _int64(time_value.get("unix_nanoseconds"))
+        if time_value.get("clock_id") is not None:
+            _text(time_value.get("clock_id"))
+        uncertainty = time_value.get("uncertainty_ns")
         if uncertainty is not None and _int64(uncertainty) < 0:
             raise _Malformed("malformed time uncertainty")
     return value
@@ -274,7 +279,7 @@ def _value(raw: Any) -> Mapping[str, Any]:
 
 def _fact_key(raw: Any) -> str:
     key = _object(raw)
-    for member in ("packId", "packVersion", "factId"):
+    for member in ("pack_id", "pack_version", "fact_id"):
         _text(key.get(member))
     for dimension in _list(key.get("dimensions"), MAX_DIMENSIONS):
         dimension = _object(dimension)
@@ -290,17 +295,17 @@ def _revisions(record: Mapping[str, Any]) -> Revisions:
 
 def _parse_asset(raw: Any) -> AssetState:
     record = _object(raw)
-    asset_id = _text(record.get("assetId"))
-    reason = record.get("unavailableReason")
+    asset_id = _text(record.get("asset_id"))
+    reason = record.get("unavailable_reason")
     snapshot, projection = record.get("snapshot"), record.get("projection")
     if reason is not None:
         if not isinstance(reason, str) or reason not in UNAVAILABLE_REASONS or snapshot is not None or projection is not None:
             raise _Malformed("unavailable asset carries state or an unknown reason")
         return AssetState(asset_id, None, None, (), (), reason)
     snapshot, projection = _object(snapshot), _object(projection)
-    snapshot_id = _text(snapshot.get("snapshotId"))
+    snapshot_id = _text(snapshot.get("snapshot_id"))
     revisions = _revisions(snapshot)
-    if projection.get("snapshotId") != snapshot_id or _revisions(projection) != revisions:
+    if projection.get("snapshot_id") != snapshot_id or _revisions(projection) != revisions:
         raise _Malformed("projection and snapshot identities are mixed")
 
     facts = []
@@ -310,7 +315,7 @@ def _parse_asset(raw: Any) -> AssetState:
         for candidate in _list(envelope.get("candidates"), MAX_CANDIDATES):
             candidate = _object(candidate)
             value = candidate.get("value")
-            candidates.append(Candidate(_text(candidate.get("candidateId")), _uint64(candidate.get("revision")), None if value is None else _canonical(_value(value))))
+            candidates.append(Candidate(_text(candidate.get("candidate_id")), _uint64(candidate.get("revision")), None if value is None else _canonical(_value(value))))
         if len({candidate.candidate_id for candidate in candidates}) != len(candidates):
             raise _Malformed("duplicate candidate identity")
         facts.append(Fact(_fact_key(envelope.get("key")), _uint64(envelope.get("revision")), tuple(candidates)))
@@ -321,7 +326,7 @@ def _parse_asset(raw: Any) -> AssetState:
     seen: set[tuple[str, str]] = set()
     for disposition in _list(projection.get("dispositions"), MAX_DISPOSITIONS):
         disposition = _object(disposition)
-        kind, item_id, outcome = disposition.get("kind"), _text(disposition.get("itemId")), disposition.get("outcome")
+        kind, item_id, outcome = disposition.get("kind"), _text(disposition.get("item_id")), disposition.get("outcome")
         if not isinstance(kind, str) or not isinstance(outcome, str) or kind not in ITEM_KINDS or outcome not in OUTCOMES or (kind, item_id) in seen:
             raise _Malformed("unknown or duplicate disposition")
         seen.add((kind, item_id))
@@ -331,7 +336,7 @@ def _parse_asset(raw: Any) -> AssetState:
             description = loss.get("description")
             if not isinstance(loss.get("kind"), str) or loss.get("kind") not in LOSS_KINDS or not isinstance(loss.get("reversible"), bool) or not isinstance(description, str) or len(description) > MAX_DESCRIPTION:
                 raise _Malformed("malformed loss detail")
-            sources = tuple(_text(item) for item in _list(loss.get("sourceItems"), MAX_LOSS))
+            sources = tuple(_text(item) for item in _list(loss.get("source_items"), MAX_LOSS))
             losses.append(Loss(loss["kind"], sources, description, loss["reversible"]))
         dispositions.append(Disposition(kind, item_id, outcome, _optional_text(disposition.get("reason")), tuple(losses)))
     return AssetState(asset_id, snapshot_id, revisions, tuple(facts), tuple(dispositions))
@@ -436,7 +441,7 @@ class SemanticFeed:
         return self.state()
 
     def _read(self, cancel: CancelToken) -> Any:
-        variables = {"assetIds": list(self._asset_ids)}
+        variables = {"asset_ids": list(self._asset_ids)}
         for attempt in range(self._max_attempts):
             if cancel.is_set():
                 raise Cancelled()
@@ -465,7 +470,7 @@ class SemanticFeed:
             return
         try:
             data = _object(response.get("data"))
-            assets = _list(_object(data.get("semanticSnapshot")).get("assets"), MAX_ASSETS)
+            assets = _list(_object(data.get("semantic_snapshot")).get("assets"), MAX_ASSETS)
             parsed = [_parse_asset(asset) for asset in assets]
         except _Malformed as error:
             self._faults = (f"response rejected: {error}",)

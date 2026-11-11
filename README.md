@@ -74,3 +74,18 @@ credentials, call a live Gateway, deploy a node, prove Matter conformance or
 certification, establish ecosystem interoperability, or qualify real hardware.
 Its fixture uses temporary test storage and cleans itself up. See
 [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Offline semantic snapshot consumer
+
+The injected reader in `runtime/semantic_feed.py` requests
+`semantic_snapshot(asset_ids:)` and consumes snake_case keys recursively.
+Retired spellings are rejected; there are no aliases or fallback requests.
+Exact decimal strings, revision axes, dimensions, projection loss and unavailable
+state are retained. Authentication belongs to the injected client; feed offers
+remain advisory and cannot authorize allocation or commissioning.
+
+This consumer is outside the add-on bill of materials. This artifact-changing
+contract adoption requires renewed affected security, hardware and candidate
+evidence before release. Synthetic tests establish neither native qualification
+nor physical validation. The coordinated documentation links must be checked
+against the final public documentation before shipping.

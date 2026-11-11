@@ -183,7 +183,7 @@ source claims without publishing private input locations. Only [N], [S], [H]
 and [I] were supplied and inspected; downstream driver/native references named
 by [H] remain follow-up evidence, not inspected authority here.
 
-- [N] [B524 register catalog](https://github.com/Project-Helianthus/helianthus-docs-ebus/blob/main/protocols/vaillant/ebus-vaillant-B524-register-map.md): Table Legend, Group Topology, current bounds, Circuits, Solar Circuit and Circuit State Enum.
+- [N] [B524 register catalog](https://github.com/Project-Helianthus/helianthus-docs-ebus/blob/main/protocols/vaillant/ebus-vaillant-b524-register-map.md): Table Legend, Group Topology, current bounds, Circuits, Solar Circuit and Circuit State Enum.
 - [S] [Thermal definitions](https://github.com/Project-Helianthus/helianthus-semreg/blob/main/semreg/v1/packs/thermal/definitions.go): `fields`, `dimensions`, `services`, `capabilities`, `operations`.
 - [H] [Heating source inventory](https://github.com/Project-Helianthus/helianthus-matter-binding/blob/main/docs/target-profile/heating.md): Circuits, DHW, direct boiler boundaries and commands, Manual contract cases and transition review.
 - [I] [Inventory completeness](https://github.com/Project-Helianthus/helianthus-matter-binding/blob/main/docs/target-profile/inventory-completeness.md): Proposed reconciliation record, Mandatory-feature closure and shared facts, Later two-way sweep and inventory checkpoint.
@@ -197,7 +197,7 @@ boiler source details, driver inspection and unresolved native semantics still
 block broader claims. No live test, commissioning, deployment or device write
 is performed or authorized by this inventory.
 
-[N]: https://github.com/Project-Helianthus/helianthus-docs-ebus/blob/main/protocols/vaillant/ebus-vaillant-B524-register-map.md
+[N]: https://github.com/Project-Helianthus/helianthus-docs-ebus/blob/main/protocols/vaillant/ebus-vaillant-b524-register-map.md
 [S]: https://github.com/Project-Helianthus/helianthus-semreg/blob/main/semreg/v1/packs/thermal/definitions.go
 [H]: https://github.com/Project-Helianthus/helianthus-matter-binding/blob/main/docs/target-profile/heating.md
 [I]: https://github.com/Project-Helianthus/helianthus-matter-binding/blob/main/docs/target-profile/inventory-completeness.md
