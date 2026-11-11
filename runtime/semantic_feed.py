@@ -220,7 +220,7 @@ def _object(value: Any) -> Mapping[str, Any]:
 def _canonical(value: Any) -> str:
     def strip(item: Any) -> Any:
         if isinstance(item, Mapping):
-            return {key: strip(member) for key, member in item.items() if member is not None}
+            return {key: strip(member) for key, member in _object(item).items() if member is not None}
         if isinstance(item, list):
             return [strip(member) for member in item]
         return item

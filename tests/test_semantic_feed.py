@@ -524,6 +524,27 @@ class SemanticFeedTest(unittest.TestCase):
         self.assertEqual(json.loads(state.assets[0].facts[0].candidates[0].value), value)
         self.assertEqual(state.assets[0].dispositions[0].loss[0].source_items, (FACT,))
 
+    def test_retired_keys_in_inactive_value_objects_are_rejected(self) -> None:
+        for retired in ("unixNanoseconds", "clockId", "uncertaintyNs"):
+            for location in ("candidate", "dimension"):
+                for nested in (False, True):
+                    with self.subTest(retired=retired, location=location, nested=nested):
+                        record = asset(ASSET_A, revisions(20))
+                        value = quantity("1")
+                        extra = {retired: "1"}
+                        value["time"] = {"extra": [extra]} if nested else extra
+                        fact = record["snapshot"]["facts"][0]
+                        if location == "candidate":
+                            fact["candidates"][0]["value"] = value
+                        else:
+                            fact["key"]["dimensions"][0]["value"] = value
+                        feed, client = self.primed(result(record, asset(ASSET_B)))
+                        before = feed.state()
+                        feed.refresh(self.cancel)
+                        self.assert_retained(feed, before)
+                        self.assertEqual(len(client.executes), 2)
+                        self.assertEqual(client.reconnects, [])
+
     def test_every_retired_key_is_rejected_even_beside_canonical_key(self) -> None:
         # Each key is exercised independently, both as a replacement and as an
         # extra alias. This catches fallback reads and silent alias acceptance,
