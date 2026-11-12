@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import sys
 import tempfile
 import unittest
@@ -31,6 +32,10 @@ class WorkflowPinTest(unittest.TestCase):
     def test_legacy_sdk_checks_remain_separate(self) -> None:
         workflow = (ROOT / ".github/workflows/sdk-baseline.yml").read_text()
         self.assertTrue(workflow.startswith("name: Matter Go adapter and legacy SDK validation\n"))
+        start = workflow.index("\n  legacy-sdk-fixture:\n")
+        following = re.search(r"^  [^ \n]", workflow[start + 1 :][1:], re.M)
+        legacy = workflow[start:] if following is None else workflow[start : start + 2 + following.start()]
+        self.assertIn("    name: Legacy SDK fixture (connectedhomeip)\n", legacy)
         for command in (
             'scripts/checkout_sdk.sh "$RUNNER_TEMP/connectedhomeip"',
             "source scripts/bootstrap.sh",
@@ -41,7 +46,7 @@ class WorkflowPinTest(unittest.TestCase):
             'scripts/run_upstream_fixture.sh "$RUNNER_TEMP/connectedhomeip"',
         ):
             with self.subTest(command=command):
-                self.assertIn(command, workflow)
+                self.assertIn(command, legacy)
 
     def test_sha_pin_with_version_comment_passes(self) -> None:
         self.assertEqual(check(f"- uses: actions/checkout@{SHA} # v4.4.0"), [])

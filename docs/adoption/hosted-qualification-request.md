@@ -341,11 +341,13 @@ report.
 
 ## Hosted and gate follow-through (not owned here)
 
-The legacy workflow is **Matter SDK baseline**, job `exact-sdk-linux`, in
-[`.github/workflows/sdk-baseline.yml`](../../.github/workflows/sdk-baseline.yml). It
-builds the legacy connectedhomeip fork on one amd64 runner, and its results cannot
-qualify go-fabric. Editing it is an external owner action, as are the tool and
-controller pins and the run itself. No ticket owns these, and this request changes
+The workflow is **Matter Go adapter and legacy SDK validation**, in
+[`.github/workflows/sdk-baseline.yml`](../../.github/workflows/sdk-baseline.yml). Its
+legacy job, `legacy-sdk-fixture` ("Legacy SDK fixture (connectedhomeip)"), builds
+the legacy connectedhomeip fork on one amd64 runner, and its results cannot qualify
+go-fabric. The separate `gofabric-adapter` job runs the module-mode adapter tests
+and is not this stage plan either. Replacing the legacy job is an external owner
+action, as are the tool and controller pins and the run itself. No ticket owns these, and this request changes
 none of them.
 
 The proposed O3 answer (Hypothesis, not a selection) replaces that job with the stage
