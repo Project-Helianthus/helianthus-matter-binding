@@ -58,36 +58,36 @@ def quantity(coefficient: str) -> dict[str, Any]:
 
 
 def capability(item_id: str, outcome: str = "exact", reason: str | None = None, loss: list | None = None) -> dict[str, Any]:
-    return {"kind": "capability", "itemId": item_id, "outcome": outcome, "reason": reason, "loss": loss or []}
+    return {"kind": "capability", "item_id": item_id, "outcome": outcome, "reason": reason, "loss": loss or []}
 
 
 def asset(asset_id: str, revs: dict[str, str] | None = None, *, snapshot_id: str | None = None, value: str = "1500", dispositions: list | None = None) -> dict[str, Any]:
     revs = revs or revisions()
     snapshot_id = snapshot_id or f"snapshot:{asset_id}:{revs['semantic']}"
-    key = {"packId": "pack.synthetic", "packVersion": "1.0.0", "factId": FACT, "dimensions": [{"id": "dimension.synthetic.phase", "value": {**quantity("1"), "kind": "text", "quantity": None, "text": "total"}}]}
+    key = {"pack_id": "pack.synthetic", "pack_version": "1.0.0", "fact_id": FACT, "dimensions": [{"id": "dimension.synthetic.phase", "value": {**quantity("1"), "kind": "text", "quantity": None, "text": "total"}}]}
     if dispositions is None:
         dispositions = [
             capability(POWER),
-            {"kind": "fact", "itemId": FACT, "outcome": "exact", "reason": None, "loss": []},
+            {"kind": "fact", "item_id": FACT, "outcome": "exact", "reason": None, "loss": []},
         ]
     return {
-        "assetId": asset_id,
-        "unavailableReason": None,
+        "asset_id": asset_id,
+        "unavailable_reason": None,
         "snapshot": {
-            "snapshotId": snapshot_id,
+            "snapshot_id": snapshot_id,
             "revisions": dict(revs),
-            "facts": [{"revision": revs["facts"], "key": key, "candidates": [{"candidateId": f"candidate:{asset_id}", "revision": revs["facts"], "value": quantity(value)}]}],
+            "facts": [{"revision": revs["facts"], "key": key, "candidates": [{"candidate_id": f"candidate:{asset_id}", "revision": revs["facts"], "value": quantity(value)}]}],
         },
-        "projection": {"snapshotId": snapshot_id, "revisions": dict(revs), "dispositions": dispositions},
+        "projection": {"snapshot_id": snapshot_id, "revisions": dict(revs), "dispositions": dispositions},
     }
 
 
 def unavailable(asset_id: str, reason: str = "semantic.read.reason.source_unavailable") -> dict[str, Any]:
-    return {"assetId": asset_id, "unavailableReason": reason, "snapshot": None, "projection": None}
+    return {"asset_id": asset_id, "unavailable_reason": reason, "snapshot": None, "projection": None}
 
 
 def result(*assets: dict[str, Any]) -> dict[str, Any]:
-    return {"data": {"semanticSnapshot": {"assets": list(assets)}}}
+    return {"data": {"semantic_snapshot": {"assets": list(assets)}}}
 
 
 class FakeClient:
@@ -174,17 +174,17 @@ class SemanticFeedTest(unittest.TestCase):
         feed, client = self.primed()
         document, variables, timeout, cancel = client.executes[0]
         self.assertEqual(document, QUERY)
-        self.assertEqual(variables, {"assetIds": [ASSET_A, ASSET_B]})
+        self.assertEqual(variables, {"asset_ids": [ASSET_A, ASSET_B]})
         self.assertEqual(timeout, 10.0)
         self.assertIs(cancel, self.cancel)
-        self.assertIn("semanticSnapshot(assetIds: $assetIds)", QUERY)
+        self.assertIn("semantic_snapshot(asset_ids: $asset_ids)", QUERY)
         self.assertNotIn("mutation", QUERY)
-        for member in (*REVISION_AXES, "snapshotId", "unavailableReason", "candidates", "value", "loss", "sourceItems", "reversible", "outcome", "reason"):
+        for member in (*REVISION_AXES, "snapshot_id", "unavailable_reason", "candidates", "value", "loss", "source_items", "reversible", "outcome", "reason"):
             self.assertIn(member, QUERY)
         self.assertEqual(feed.asset_ids, (ASSET_A, ASSET_B))
 
     def test_complete_state_retains_exact_revision_value_and_loss(self) -> None:
-        loss = [{"kind": "precision", "sourceItems": [FACT], "description": "synthetic rounding", "reversible": False}]
+        loss = [{"kind": "precision", "source_items": [FACT], "description": "synthetic rounding", "reversible": False}]
         dispositions = [capability(POWER), capability(ENERGY, "transformed", None, loss)]
         client = FakeClient(result(asset(ASSET_A, revisions(7), value="2750", dispositions=dispositions), asset(ASSET_B)))
         state = self.feed(client).refresh(self.cancel)
@@ -249,7 +249,7 @@ class SemanticFeedTest(unittest.TestCase):
         bad_revision = asset(ASSET_A, revisions(9))
         bad_revision["projection"]["revisions"]["capabilities"] = "99"
         bad_identity = asset(ASSET_A, revisions(9))
-        bad_identity["projection"]["snapshotId"] = "snapshot:other"
+        bad_identity["projection"]["snapshot_id"] = "snapshot:other"
         for label, record in (("revision", bad_revision), ("identity", bad_identity)):
             with self.subTest(mixed=label):
                 feed, _ = self.primed(result(record, asset(ASSET_B)))
@@ -258,7 +258,7 @@ class SemanticFeedTest(unittest.TestCase):
                 self.assert_retained(feed, before)
 
     def test_withheld_and_unsupported_items_stay_withheld(self) -> None:
-        loss = [{"kind": "unit", "sourceItems": [FACT], "description": "synthetic", "reversible": True}]
+        loss = [{"kind": "unit", "source_items": [FACT], "description": "synthetic", "reversible": True}]
         dispositions = [
             capability(POWER),
             capability(ENERGY, "withheld", "semantic.read.reason.capability_unqualified"),
@@ -267,7 +267,7 @@ class SemanticFeedTest(unittest.TestCase):
             capability("capability.synthetic.transformed", "transformed", None, loss),
             capability("capability.synthetic.unrepresentable", "unrepresentable"),
             capability("capability.synthetic.lossy-exact", "exact", None, loss),
-            {"kind": "fact", "itemId": FACT, "outcome": "exact", "reason": None, "loss": []},
+            {"kind": "fact", "item_id": FACT, "outcome": "exact", "reason": None, "loss": []},
         ]
         feed, client = self.primed(result(asset(ASSET_A, revisions(3), dispositions=dispositions), asset(ASSET_B, revisions(3))))
         feed.refresh(self.cancel)
@@ -337,7 +337,7 @@ class SemanticFeedTest(unittest.TestCase):
     def test_partial_errors_keep_last_known_good_and_withhold_offers(self) -> None:
         partial = result(asset(ASSET_A, revisions(30), value="1"), asset(ASSET_B, revisions(30)))
         partial["errors"] = [{"message": "semantic snapshot read: CONFLICT", "extensions": {"code": "CONFLICT"}}, {"message": "x"}]
-        nulled = {"data": {"semanticSnapshot": None}, "errors": [{"message": "m", "extensions": {"code": "UNAVAILABLE"}}]}
+        nulled = {"data": {"semantic_snapshot": None}, "errors": [{"message": "m", "extensions": {"code": "UNAVAILABLE"}}]}
         for label, response, faults in (
             ("data with errors", partial, ("graphql error CONFLICT", "graphql error UNSPECIFIED")),
             ("null field", nulled, ("graphql error UNAVAILABLE",)),
@@ -382,11 +382,11 @@ class SemanticFeedTest(unittest.TestCase):
             "unknown outcome": mutate(("projection", "dispositions"), [capability(POWER, "approximate")]),
             "unknown kind": mutate(("projection", "dispositions"), [{**capability(POWER), "kind": "endpoint"}]),
             "duplicate disposition": mutate(("projection", "dispositions"), [capability(POWER), capability(POWER)]),
-            "unknown loss": mutate(("projection", "dispositions"), [capability(POWER, "transformed", None, [{"kind": "guess", "sourceItems": [], "description": "", "reversible": True}])]),
-            "oversized loss text": mutate(("projection", "dispositions"), [capability(POWER, "transformed", None, [{"kind": "unit", "sourceItems": [], "description": "x" * 1025, "reversible": True}])]),
+            "unknown loss": mutate(("projection", "dispositions"), [capability(POWER, "transformed", None, [{"kind": "guess", "source_items": [], "description": "", "reversible": True}])]),
+            "oversized loss text": mutate(("projection", "dispositions"), [capability(POWER, "transformed", None, [{"kind": "unit", "source_items": [], "description": "x" * 1025, "reversible": True}])]),
             "missing snapshot": mutate(("snapshot",), None),
             "unknown unavailable reason": unavailable(ASSET_A, "semantic.read.reason.anything"),
-            "unavailable with state": {**asset(ASSET_A, revisions(9)), "unavailableReason": "semantic.read.reason.asset_unknown"},
+            "unavailable with state": {**asset(ASSET_A, revisions(9)), "unavailable_reason": "semantic.read.reason.asset_unknown"},
             "empty fact key": mutate(("snapshot", "facts"), [{"revision": "9", "key": {}, "candidates": []}]),
             "invalid quantity coefficient": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), quantity("not-a-number")),
             "quantity without number": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), {**quantity("1"), "quantity": {"unit": "unit.synthetic.watt"}}),
@@ -394,11 +394,11 @@ class SemanticFeedTest(unittest.TestCase):
             "list value kind": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), {**quantity("1"), "kind": []}),
             "list disposition kind": mutate(("projection", "dispositions"), [{**capability(POWER), "kind": []}]),
             "dict disposition outcome": mutate(("projection", "dispositions"), [capability(POWER, {})]),
-            "list loss kind": mutate(("projection", "dispositions"), [capability(POWER, "transformed", None, [{"kind": [], "sourceItems": [], "description": "", "reversible": True}])]),
+            "list loss kind": mutate(("projection", "dispositions"), [capability(POWER, "transformed", None, [{"kind": [], "source_items": [], "description": "", "reversible": True}])]),
             "list unavailable reason": unavailable(ASSET_A, []),
-            "time with text instant": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), {"kind": "time", "time": {"unixNanoseconds": "not-a-time"}}),
-            "time with list clock": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), {"kind": "time", "time": {"unixNanoseconds": "1", "clockId": []}}),
-            "time with negative uncertainty": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), {"kind": "time", "time": {"unixNanoseconds": "1", "uncertaintyNs": "-5"}}),
+            "time with text instant": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), {"kind": "time", "time": {"unix_nanoseconds": "not-a-time"}}),
+            "time with list clock": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), {"kind": "time", "time": {"unix_nanoseconds": "1", "clock_id": []}}),
+            "time with negative uncertainty": mutate(("snapshot", "facts", 0, "candidates", 0, "value"), {"kind": "time", "time": {"unix_nanoseconds": "1", "uncertainty_ns": "-5"}}),
             "duplicate fact key": mutate(("snapshot", "facts"), asset(ASSET_A)["snapshot"]["facts"] * 2),
             "duplicate candidate id": mutate(("snapshot", "facts", 0, "candidates"), asset(ASSET_A)["snapshot"]["facts"][0]["candidates"] * 2),
             "oversized facts": mutate(("snapshot", "facts"), [{"revision": "1", "key": {}, "candidates": []}] * 4097),
@@ -410,7 +410,7 @@ class SemanticFeedTest(unittest.TestCase):
                 feed.refresh(self.cancel)
                 self.assert_retained(feed, before)
                 self.assertTrue(feed.state().faults[0].startswith("response rejected"), feed.state().faults)
-        for response in (None, [], {"data": None}, {"data": {"semanticSnapshot": {"assets": None}}}):
+        for response in (None, [], {"data": None}, {"data": {"semantic_snapshot": {"assets": None}}}):
             with self.subTest(response=response):
                 feed, _ = self.primed(response)
                 before = feed.state()
@@ -513,6 +513,130 @@ class SemanticFeedTest(unittest.TestCase):
             feed.refresh(PollToken(set_after=2))
         self.assertLess(time.monotonic() - started, 5.0)
         self.assertEqual(client.reconnects, [])
+
+    def test_canonical_nested_time_and_loss_are_retained_exactly(self) -> None:
+        record = asset(ASSET_A)
+        value = {"kind": "time", "time": {"unix_nanoseconds": "-123", "clock_id": "clock.synthetic", "uncertainty_ns": "7"}}
+        record["snapshot"]["facts"][0]["candidates"][0]["value"] = value
+        record["projection"]["dispositions"][0]["loss"] = [{"kind": "time", "source_items": [FACT], "description": "synthetic time loss", "reversible": False}]
+        state = self.feed(FakeClient(result(record, asset(ASSET_B)))).refresh(self.cancel)
+        self.assertTrue(state.current, state.faults)
+        self.assertEqual(json.loads(state.assets[0].facts[0].candidates[0].value), value)
+        self.assertEqual(state.assets[0].dispositions[0].loss[0].source_items, (FACT,))
+
+    def test_retired_keys_in_inactive_value_objects_are_rejected(self) -> None:
+        for retired in ("unixNanoseconds", "clockId", "uncertaintyNs"):
+            for location in ("candidate", "dimension"):
+                for nested in (False, True):
+                    with self.subTest(retired=retired, location=location, nested=nested):
+                        record = asset(ASSET_A, revisions(20))
+                        value = quantity("1")
+                        extra = {retired: "1"}
+                        value["time"] = {"extra": [extra]} if nested else extra
+                        fact = record["snapshot"]["facts"][0]
+                        if location == "candidate":
+                            fact["candidates"][0]["value"] = value
+                        else:
+                            fact["key"]["dimensions"][0]["value"] = value
+                        feed, client = self.primed(result(record, asset(ASSET_B)))
+                        before = feed.state()
+                        feed.refresh(self.cancel)
+                        self.assert_retained(feed, before)
+                        self.assertEqual(len(client.executes), 2)
+                        self.assertEqual(client.reconnects, [])
+
+    def test_every_retired_key_is_rejected_even_beside_canonical_key(self) -> None:
+        # Each key is exercised independently, both as a replacement and as an
+        # extra alias. This catches fallback reads and silent alias acceptance,
+        # including optional time/provenance fields that could otherwise vanish.
+        names = {
+            "semantic_snapshot": "semanticSnapshot", "asset_id": "assetId",
+            "snapshot_id": "snapshotId", "pack_id": "packId",
+            "pack_version": "packVersion", "fact_id": "factId",
+            "candidate_id": "candidateId", "item_id": "itemId",
+            "source_items": "sourceItems", "unavailable_reason": "unavailableReason",
+            "unix_nanoseconds": "unixNanoseconds", "clock_id": "clockId",
+            "uncertainty_ns": "uncertaintyNs",
+        }
+        record = asset(ASSET_A)
+        record["snapshot"]["facts"][0]["candidates"][0]["value"] = {"kind": "time", "time": {"unix_nanoseconds": "1", "clock_id": "clock.synthetic", "uncertainty_ns": "0"}}
+        record["projection"]["dispositions"][0]["loss"] = [{"kind": "time", "source_items": [FACT], "description": "synthetic", "reversible": False}]
+        response = result(record, asset(ASSET_B))
+
+        def locations(value, path=()):
+            if isinstance(value, dict):
+                for key, member in value.items():
+                    if key in names:
+                        yield path, key
+                    yield from locations(member, (*path, key))
+            elif isinstance(value, list):
+                for index, member in enumerate(value):
+                    yield from locations(member, (*path, index))
+
+        seen = set()
+        for path, key in locations(response):
+            seen.add(key)
+            for extra in (False, True):
+                with self.subTest(path=path, key=key, extra=extra):
+                    bad = copy.deepcopy(response)
+                    target = bad
+                    for step in path:
+                        target = target[step]
+                    target[names[key]] = target[key]
+                    if not extra:
+                        del target[key]
+                    feed, client = self.primed(bad)
+                    before = feed.state()
+                    feed.refresh(self.cancel)
+                    self.assert_retained(feed, before)
+                    self.assertEqual(len(client.executes), 2)
+                    self.assertEqual(client.reconnects, [])
+        self.assertEqual(seen, set(names))
+        self.assertNotIn("assetIds", QUERY)
+        self.assertNotIn(": semantic_snapshot", QUERY)
+
+    def test_each_fact_identity_and_revision_field_is_preserved_and_guarded(self) -> None:
+        # Field -> mutation caught: dropping/rewriting that identity during decode
+        # or ignoring it in equal-revision conflict checks. Revision axes are
+        # independently tested above for both regression and advance.
+        paths = [
+            ("snapshot", "facts", 0, "key", member)
+            for member in ("pack_id", "pack_version", "fact_id")
+        ] + [
+            ("snapshot", "facts", 0, "key", "dimensions", 0, "id"),
+            ("snapshot", "facts", 0, "key", "dimensions", 0, "value", "text"),
+            ("snapshot", "facts", 0, "revision"),
+            ("snapshot", "facts", 0, "candidates", 0, "candidate_id"),
+            ("snapshot", "facts", 0, "candidates", 0, "revision"),
+            ("projection", "dispositions", 0, "item_id"),
+        ]
+        for path in paths:
+            with self.subTest(field=path):
+                changed = asset(ASSET_A)
+                target = changed
+                for step in path[:-1]:
+                    target = target[step]
+                target[path[-1]] = "99" if path[-1] == "revision" else "synthetic.changed"
+                feed, _ = self.primed(result(changed, asset(ASSET_B)))
+                before = feed.state()
+                feed.refresh(self.cancel)
+                self.assert_retained(feed, before)
+                # A first publication must retain the varied field exactly.
+                fresh = self.feed(FakeClient(result(changed, asset(ASSET_B)))).refresh(self.cancel)
+                self.assertTrue(fresh.current, fresh.faults)
+                fact = fresh.assets[0].facts[0]
+                if "key" in path:
+                    retained = json.loads(fact.key)
+                    for step in path[path.index("key") + 1:]:
+                        retained = retained[step]
+                elif "candidates" in path:
+                    retained = getattr(fact.candidates[0], path[-1])
+                elif "dispositions" in path:
+                    retained = fresh.assets[0].dispositions[0].item_id
+                else:
+                    retained = fact.revision
+                expected = int(target[path[-1]]) if path[-1] == "revision" else target[path[-1]]
+                self.assertEqual(retained, expected)
 
     def test_construction_bounds(self) -> None:
         client = FakeClient()

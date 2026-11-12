@@ -9,7 +9,7 @@ before Helianthus 1.0.
 
 ## Source authority and scope
 
-Protocol facts belong first to the [public native documentation contract](https://github.com/Project-Helianthus/helianthus-docs-ebus/blob/main/protocols/vaillant/ebus-vaillant-B524-register-map.md),
+Protocol facts belong first to the [public native documentation contract](https://github.com/Project-Helianthus/helianthus-docs-ebus/blob/main/protocols/vaillant/ebus-vaillant-b524-register-map.md),
 with projection context in the [public mapping contract](https://github.com/Project-Helianthus/helianthus-docs-ebus/blob/main/architecture/b524-semantic-mapping.md).
 The supplied binding [air-conditioning inventory](../target-profile/air-conditioning.md)
 records controller and remote sensor family coverage, unknowns and loss. Its
