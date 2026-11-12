@@ -20,15 +20,16 @@ exact-HEAD review have passed.
 
 ## Validation
 
-The local, dependency-free baseline is:
+The required local baseline is the lock validator, the unit tests and the
+go-fabric adapter commands below:
 
 ```bash
 python3 tools/validate_lock.py
 python3 -m unittest discover -s tests -v
 ```
 
-The hosted workflow validates both Go module configurations with workspace mode
-disabled. Run the same adapter checks from the module root:
+Run the adapter checks from the module root, in module mode with workspace mode
+disabled, without and with the `gofabric` build tag:
 
 ```bash
 export GOWORK=off GO111MODULE=on
@@ -48,7 +49,15 @@ discovery or sockets. See [build qualification](docs/go-fabric-build-qualificati
 for the evidence boundary. Hosted full tagged execution remains required;
 compilation or static workflow tests do not establish hosted success.
 
-Separately, the retained legacy SDK steps perform the recursive locked checkout,
+The hosted workflow "Matter Go adapter and legacy SDK validation" runs two
+jobs. `gofabric-adapter`, shown as "Go adapter (go-fabric, module mode)", runs
+the lock validator, the unit tests and the adapter commands above.
+`legacy-sdk-fixture`, shown as "Legacy SDK fixture (connectedhomeip)", needs the
+adapter job and keeps the legacy SDK steps, because the lock, checkout script
+and fixture still select the legacy fork until the pin migration replaces them.
+A green legacy job is not go-fabric qualification.
+
+In that job, the retained legacy SDK steps perform the recursive locked checkout,
 check tracked blobs, build `all-devices-app` and `chip-tool`, run focused Electrical
 Power Measurement and Power Topology tests, and run the bounded upstream
 Electrical Sensor controller fixture. These Linux-runner checks provide legacy
