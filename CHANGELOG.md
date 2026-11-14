@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- CI: Ruff 0.15.10 now checks every Python file for naming (`N`), complexity
+  (`C90`, at most 10) and statement-count (`PLR0915`, at most 50) findings
+  against the committed `scripts/python-rules-baseline.json`, in the
+  `gofabric-adapter` job and in the local validation list. New findings and
+  grown measured values fail, including in a file with recorded debt; records
+  without a finding must leave the baseline. The six existing findings are
+  recorded, not fixed. Class N: every shipped Python file is AST-identical
+  without docstrings and every other existing file outside the workflow,
+  `AGENTS.md` and this changelog is byte-identical.
+
 - Breaking: the Python semantic feed reader and its tests are removed. Nothing in
   this repository reads the gateway feed; the in-process Matter driver of the
   standalone gateway projects the shared semantic data

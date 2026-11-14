@@ -26,7 +26,18 @@ go-fabric adapter commands below:
 ```bash
 python3 tools/validate_lock.py
 python3 -m unittest discover -s tests -v
+python3 scripts/check_python_rules.py --check
 ```
+
+The unit tests and the Python rule check need Ruff 0.15.10 on `PATH`.
+`ruff.toml` enables the naming (`N`), complexity (`C90`, at most 10) and
+statement-count (`PLR0915`, at most 50) rules for every Python file, and the
+check is its only accepted configuration. `scripts/python-rules-baseline.json`
+records the existing findings by path, rule, symbol and measured value. A new
+finding, a measured value above its record, or a record without a finding fails
+the check. After removing debt, regenerate the baseline with
+`python3 scripts/check_python_rules.py --regenerate` and review the diff; never
+add a record to admit new debt.
 
 Run the adapter checks from the module root, in module mode with workspace mode
 disabled, without and with the `gofabric` build tag:
@@ -50,8 +61,9 @@ for the evidence boundary. Hosted full tagged execution remains required;
 compilation or static workflow tests do not establish hosted success.
 
 The hosted workflow "Matter Go adapter and legacy SDK validation" runs two
-jobs. `gofabric-adapter`, shown as "Go adapter (go-fabric, module mode)", runs
-the lock validator, the unit tests and the adapter commands above.
+jobs. `gofabric-adapter`, shown as "Go adapter (go-fabric, module mode)",
+installs the hash-pinned Ruff and runs the lock validator, the unit tests, the
+Python rule check and the adapter commands above.
 `legacy-sdk-fixture`, shown as "Legacy SDK fixture (connectedhomeip)", needs the
 adapter job and keeps the legacy SDK steps, because the lock, checkout script
 and fixture still select the legacy fork until the pin migration replaces them.
