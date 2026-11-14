@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "generator": {
+    "tool": "ruff",
+    "version": "0.15.10"
+  },
+  "rules": [
+    "N",
+    "C90",
+    "PLR0915"
+  ],
+  "thresholds": {
+    "max-complexity": 10,
+    "max-statements": 50
+  },
+  "regenerate": "python3 scripts/check_python_rules.py --regenerate",
+  "records": [
+    {
+      "path": "runtime/adoption_baseline.py",
+      "rule": "C901",
+      "symbol": "evaluate_adoption_baseline",
+      "measured": 14
+    },
+    {
+      "path": "runtime/endpoint_selection.py",
+      "rule": "C901",
+      "symbol": "EndpointSelector.reconcile",
+      "measured": 17
+    },
+    {
+      "path": "runtime/endpoint_selection.py",
+      "rule": "C901",
+      "symbol": "_parse_ledger",
+      "measured": 16
+    },
+    {
+      "path": "runtime/production_readiness.py",
+      "rule": "C901",
+      "symbol": "validate_composition",
+      "measured": 20
+    },
+    {
+      "path": "tools/validate_lock.py",
+      "rule": "C901",
+      "symbol": "_UsesScanner.run",
+      "measured": 18
+    },
+    {
+      "path": "tools/validate_lock.py",
+      "rule": "PLR0915",
+      "symbol": "_UsesScanner.run",
+      "measured": 65
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+# Naming, complexity and statement-count rules for every Python file in the
+# repository. scripts/check_python_rules.py runs this file as the only Ruff
+# configuration and compares the result with scripts/python-rules-baseline.json;
+# it accepts no other setting, so a change here needs a matching guard review.
+required-version = "==0.15.10"
+target-version = "py311"
+# Local scratch is not a repository source input.
+extend-exclude = [".tmp"]
+
+[lint]
+select = ["N", "C90", "PLR0915"]
+
+[lint.mccabe]
+max-complexity = 10
+
+[lint.pylint]
+max-statements = 50
