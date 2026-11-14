@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Breaking: the Python semantic feed reader and its tests are removed. Nothing in
+  this repository reads the gateway feed; the in-process Matter driver of the
+  standalone gateway projects the shared semantic data
+  (Project-Helianthus/helianthus-ebusgateway#1492). No replacement reader is
+  provided; readiness and allocation stay fail closed.
+
 - CI: the hosted workflow now runs two named jobs, `gofabric-adapter` ("Go adapter
   (go-fabric, module mode)") and `legacy-sdk-fixture` ("Legacy SDK fixture
   (connectedhomeip)"), so a green legacy check is not read as go-fabric

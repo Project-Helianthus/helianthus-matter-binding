@@ -75,17 +75,11 @@ certification, establish ecosystem interoperability, or qualify real hardware.
 Its fixture uses temporary test storage and cleans itself up. See
 [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Offline semantic snapshot consumer
+## Semantic snapshot source
 
-The injected reader in `runtime/semantic_feed.py` requests
-`semantic_snapshot(asset_ids:)` and consumes snake_case keys recursively.
-Retired spellings are rejected; there are no aliases or fallback requests.
-Exact decimal strings, revision axes, dimensions, projection loss and unavailable
-state are retained. Authentication belongs to the injected client; feed offers
-remain advisory and cannot authorize allocation or commissioning.
-
-This consumer is outside the add-on bill of materials. This artifact-changing
-contract adoption requires renewed affected security, hardware and candidate
-evidence before release. Synthetic tests establish neither native qualification
-nor physical validation. The coordinated documentation links must be checked
-against the final public documentation before shipping.
+The Python semantic feed consumer is retired; this repository reads no gateway
+feed. The in-process Matter driver of the standalone gateway projects the shared
+semantic data directly
+([helianthus-ebusgateway#1492](https://github.com/Project-Helianthus/helianthus-ebusgateway/issues/1492)).
+No replacement reader is provided, and offers from the gateway cannot authorize
+allocation or commissioning here; readiness and allocation stay fail closed.
