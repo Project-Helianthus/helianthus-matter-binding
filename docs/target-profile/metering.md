@@ -1,7 +1,9 @@
-# Metering source coverage and composition gaps
+# Electrical metering rows by catalog element and composition gaps
 
 This is a partial, binding-local source-side inventory for issue #14, advancing
-matter-binding#8. It cannot close that parent or release M42/M43. It proposes
+matter-binding#8. Metering is not a pack: its rows are keyed by the catalog
+element they would populate, all in `helianthus.pack.infrastructure`, and sit
+under that element's planes. It cannot close that parent or release M42/M43. It proposes
 coverage review, not a protocol-neutral contract or an accepted Matter mapping.
 Matter mappings remain owned by the public semantic documentation repository.
 Nothing here is stable before Helianthus 1.0.
@@ -33,7 +35,8 @@ Service shorthand `phase`, `meter`, `grid_connection`, `circuit`, `site`, and
 `feeder` means `infrastructure.service.<name>` and its corresponding
 `infrastructure.dimension.<name>`. These are text dimensions, not evidence of
 physical wiring. S defines read capabilities and empty Operations/EffectRules;
-no row implies control or a write operation.
+no row implies control or a write operation. The key cell's plane list is the
+catalog's plane membership for that element, not a claim about the source.
 
 Each row separates native evidence, semantic representability, target evidence,
 and admission. **Proven** means only the cited source fact; **Hypothesis** marks
@@ -72,83 +75,113 @@ or family name may substitute for Accuracy, topology, or measurement-type
 metadata. Exact required range, resolution, error, feature and nullability
 rules remain Unknown pending the adopted normative corpus.
 
-## Infrastructure semantic inventory
+## Rows by catalog element and plane
 
-These rows inventory all 19 current S fields, grouped only where their
+Metering is not a pack. Each row below is keyed by the catalog element it
+would populate and that element's plane membership in the
+[element catalog](https://github.com/Project-Helianthus/helianthus-docs-semantic/blob/main/api/v1/element-catalog-v1.json);
+every electrical element here belongs to `helianthus.pack.infrastructure`. The
+provenance column names the source file (S, M or E) and its native owner and
+profile; provenance is not part of the key. Rows sharing an element sit
+together, but each source keeps its own row: equal elements do not merge
+source facts, scopes or evidence. A row whose fact has no catalog element says
+so in its key cell. Direction is read-only (RO) throughout; import/export
+denotes energy flow, not a command direction. All rows have G and Denied
+admission as defined above.
+
+### Source notes
+
+**S.** The S rows inventory all 19 current S fields, grouped only where their
 representation and gaps coincide. Native producers are unavailable in S;
-Gateway publication is Unknown throughout. Direction is read-only (RO);
-import/export below denotes energy flow, not a command direction. All rows have
-G and Denied admission as defined above.
+Gateway publication is Unknown throughout.
 
-| Family / owner and source | Native evidence / qualification | SemReg pack field / service | Target evidence | Mandatory gaps | Direction | Status; loss or withholding reason | Proven / Hypothesis / Unknown; concrete falsifier | Public evidence locator |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.ac.active_power`, W, signed; phase | T?; ActivePower shape only in R | G; phase reference, sign convention | RO | Candidate; preserve negative values | Proven signed definition; Hypothesis projection; falsified by unsigned target or opposite sign convention | S `fields`, bounds ±10^7 |
-| Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.ac.reactive_power`, var, signed; phase | T? | G; reactive convention | RO | Candidate; no absolute-value conversion | Proven definition; Hypothesis; falsified by loss of sign or incompatible reactive convention | S `fields`, bounds ±10^7 |
-| Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.ac.apparent_power`, VA; phase | T? | G; phase association | RO | Candidate; VA is not W | Proven definition; Hypothesis; falsified by target requiring active power instead of apparent | S `fields` |
-| Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.ac.current`, A; phase | TC? | G; current kind and phase association | RO | Candidate; AC current is not automatically ActiveCurrent | Proven definition; Hypothesis; falsified by required active-current component absent from source | S `fields`; L `target.active_current_attribute` |
-| Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.ac.voltage`, V; phase | T? | G; line-neutral versus line-line | RO | Candidate; reference must be evidenced | Proven definition; Hypothesis; falsified by target requiring a different voltage reference | S `fields` |
-| Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.ac.frequency`, Hz; grid_connection | T? | G; measurement location | RO | Candidate; no duplicate per-phase inference | Proven definition; Hypothesis; falsified by incompatible target scope | S `fields` |
-| Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.ac.power_factor`, ratio ±1; grid_connection | T? | G; factor/sign interpretation | RO | Candidate; ratio is not percent | Proven definition; Hypothesis; falsified by differing target factor convention | S `fields` |
-| Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.energy.import`, `infrastructure.energy.export`, kWh; meter | T?; energy target Unknown | G; accumulation/reset basis, flow reference | RO; import/export separate | Candidate; never merge counters | Proven definitions; Hypothesis; falsified by swapped direction or incompatible accumulation interval | S `fields` |
-| Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.power.apparent`, VA; grid_connection | T? | G; aggregate scope | RO | Candidate; not the phase field | Proven definition; Hypothesis; falsified by target requiring phase-local rather than aggregate data | S `fields` |
-| Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.power.import_active`, `infrastructure.power.export_active`, nonnegative W; grid_connection | T? | G; flow convention and derivation | RO; import/export separate | Candidate; not interchangeable with signed phase power | Proven definitions; Hypothesis; falsified by source net power without a documented split rule | S `fields` |
-| Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.power.import_reactive`, `infrastructure.power.export_reactive`, nonnegative var; grid_connection | T? | G; reactive flow convention | RO; import/export separate | Candidate; preserve direction | Proven definitions; Hypothesis; falsified by unresolved quadrant or sign convention | S `fields` |
-| Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.status.breaker` closed/open, `infrastructure.status.interlock` active/clear; circuit | T? | G; source status interpretation | RO | Withheld from metering; status is not command support | Proven symbols; Unknown target/publication | S `fields`, `index` |
-| Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.status.connection` connected/disconnected, `infrastructure.status.readiness` not_ready/ready; grid_connection | T? | G; status provenance | RO | Withheld; readiness does not grant endpoint admission | Proven symbols; Unknown target/publication | S `fields`; R `evaluate` |
-| Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.status.fault` clear/present; site | T? | G; fault interpretation | RO | Withheld; do not collapse arbitrary native events | Proven symbols; Unknown native mapping/target | S `fields` |
-| Infrastructure grouping / SemReg, S | No physical topology evidence; unqualified | site/grid_connection/feeder/circuit/phase/meter services and read capabilities | T?; Power Topology is lock metadata only | G; physical relations and endpoint allocation | RO | Supported semantic grouping; physical topology unavailable | Proven text dimensions/services; Unknown hardware graph | S `dimensions`, `services`, `capabilities` |
-
-## SunSpec meter native coverage
-
-M supplies integer/scaled and floating meter families, with mandatory-point
+**M.** M supplies integer/scaled and floating meter families, with mandatory-point
 sets for integer models 201–204 and floating models 211–214. These are public
 protocol model identifiers, not product models. A definition list is not proof
 of live support, successful decoding, or publication. Mandatory native points
-vary by family and do not establish target mandatory facts. All rows are RO,
-unqualified, Gateway publication Unknown, target T? unless TC? is stated, and
-admission Denied with G. SemReg columns are proposed correspondences, not
-existing driver-to-SemReg adapters.
-
-| Family / owner and source | Native evidence / qualification | SemReg field / service | Target evidence | Mandatory gaps | Direction | Status; loss or withholding reason | Proven / Hypothesis / Unknown; concrete falsifier | Public evidence locator |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| SunSpec integer/scaled and float meter / modbusreg, M | Defined `A`, `AphA/B/C`, A; unqualified | Phase points candidate `infrastructure.ac.current` / phase; total has no evidenced aggregate-current correspondence | TC? | G; total versus phase; current kind | RO | Candidate phase; total withheld; no total-to-phase relabeling | Proven points; Hypothesis mapping; falsified by negative current outside S bounds or non-active current semantics | M point builders, `meterFieldID` |
-| SunSpec meter / modbusreg, M | `PhV`, `PhVphA/B/C`, V; unqualified | Phase candidate `infrastructure.ac.voltage` / phase; average withheld | T? | G; neutral reference, phase identity | RO | Candidate phase; no average-as-phase default | Proven line-neutral IDs; Hypothesis; falsified by missing neutral/reference identity | M `meterFieldID`, point builders |
-| SunSpec meter / modbusreg, M | `PPV`, `PPVphAB/BC/CA` and `PhVphAB/BC/CA` aliases, V; unqualified | No explicit line-pair field in S; phase voltage requires further contract | T? | G; line-pair representation | RO | Withheld; line-line cannot silently become line-neutral | Proven alias IDs; Unknown safe semantic/target mapping | M `integerMeterSunSpecPoints`, `meterFieldID` |
-| SunSpec meter / modbusreg, M | `Hz`, Hz; unqualified | Candidate `infrastructure.ac.frequency` / grid_connection | T? | G; grid connection identity | RO | Candidate; preserve scope | Proven point; Hypothesis; falsified by an unassociated measurement location | M point builders, `meterFieldID` |
-| SunSpec meter / modbusreg, M | `W`, `WphA/B/C`, W, signed integer or float definitions; unqualified | Phase candidate `infrastructure.ac.active_power`; total not a direct nonnegative import/export field | T? | G; sign/flow convention; total split | RO | Candidate phase; total split withheld | Proven typed points; Hypothesis; falsified by sign loss or applying total to one phase | M point builders, `meterFieldID`; S `fields` |
-| SunSpec meter / modbusreg, M | `VA`, `VAphA/B/C`, VA; unqualified | Candidate `infrastructure.power.apparent` / grid_connection and `infrastructure.ac.apparent_power` / phase | T? | G; scope, nonnegative validation | RO | Candidate; retain total/phase distinction | Proven points; Hypothesis; falsified by negative source or wrong aggregation scope | M point builders, `meterFieldID`; S `fields` |
-| SunSpec meter / modbusreg, M | `VAR`, `VARphA/B/C`, var; unqualified | Phase candidate `infrastructure.ac.reactive_power`; total directional split not established | T? | G; reactive sign/flow | RO | Candidate phase; total split withheld | Proven points; Hypothesis; falsified by unresolved sign convention or fabricated import/export split | M point builders, `meterFieldID` |
-| SunSpec meter / modbusreg, M | `PF`, `PFphA/B/C`; integer unit Pct, float unit PF; unqualified | Total candidate `infrastructure.ac.power_factor` / grid_connection; phase-specific field unavailable in S | T? | G; percent-to-ratio and float convention | RO | Candidate total only with public conversion contract; phase withheld | Proven unit difference; Hypothesis; falsified by treating integer percent as ratio or assuming float convention from its label | M point builders; S `fields` |
-| SunSpec meter / modbusreg, M | `TotWhImp/Exp`, total and phase A/B/C, Wh; unqualified | Total candidate `infrastructure.energy.import/export`, kWh / meter; phase dimension not represented by those fields | T?; energy target Unknown | G; counter/reset basis; exact Wh-to-kWh conversion | RO; separate import/export | Candidate totals; phases withheld unless a dimension-preserving contract is supplied | Proven points/units; Hypothesis; falsified by Wh labeled kWh, reversed direction, or collapsed phases | M point builders, `meterFieldID`; S `fields` |
-| SunSpec meter / modbusreg, M | `TotVAhImp/Exp`, total and phase A/B/C, VAh; unqualified | No apparent-energy field in S | T? | G; apparent-energy semantics | RO; separate import/export | Withheld; not active kWh | Proven point definitions; Unknown target/semantic mapping | M point builders, `meterFieldID` |
-| SunSpec meter / modbusreg, M | `TotVArhImpQ1/Q2`, `TotVArhExpQ3/Q4`, total and phase A/B/C, varh; unqualified | No reactive-energy/quadrant field in S | T? | G; quadrant and accumulation basis | RO; separate quadrants/flows | Withheld; preserve `Ph`/`ph` native aliases and canonical phase IDs | Proven point and alias definitions; Unknown target mapping | M float/integer builders, `meterFieldID` |
-| SunSpec integer meter / modbusreg, M | `A_SF`, `V_SF`, `Hz_SF`, `W_SF`, `VA_SF`, `VAR_SF`, `PF_SF`, `TotWh_SF`, `TotVAh_SF`, `TotVArh_SF`; unqualified | No standalone measurement correspondence | T? | G; decode/scale evidence | RO metadata | Supported native metadata; withheld as measurements; scale is not Accuracy | Proven scale links; Unknown executed decoding/target | M `integerMeterSunSpecPoints` |
-| SunSpec meter / modbusreg, M | `ID`, `L` header and family-specific required flags; unqualified | No physical source identity or topology derived | T? | G; source/model instance identity | RO metadata | Supported native layout; topology unavailable | Proven header/mandatory sets; Unknown physical composition | M `meterHeaderSunSpecPoints`, `markMeterMandatory`, `meterMandatoryPoints` |
-| SunSpec meter / modbusreg, M | `Evt` bitfield; Power_Failure, Under_Voltage, Low_PF, Over_Current, Over_Voltage, Missing_Sensor, reserved/OEM symbols; unqualified | `infrastructure.status.fault` is not an accepted event mapping | T? | G; event interpretation, unknown bits | RO | Withheld; preserve raw event bits and symbols rather than boolean collapse | Proven symbolic definitions; Unknown target/status mapping | M `meterEventSymbols`, `meterFieldID` |
+vary by family and do not establish target mandatory facts. All M rows are
+unqualified, Gateway publication Unknown and target T? unless TC? is stated.
+Their keys and SemReg columns are proposed correspondences, not existing
+driver-to-SemReg adapters.
 
 The supplied M file does not establish decoder sentinel behavior, supported
 registry dispatch, physical wiring, accuracy classes, or installed device
 coverage. Those need their public native contracts and execution evidence
 before acceptance; this inventory creates no native facts by extrapolation.
 
-## eeBUS raw readings and unavailable composition facts
-
-E supplies a bounded typed-value container, not a catalog of electrical
-readings, units, phases, features or driver publication. These rows cover its
-representable fact groups without assigning electrical semantics to JSON shape.
-All admission remains Denied; all qualification and Gateway publication remain
+**E.** E supplies a bounded typed-value container, not a catalog of electrical
+readings, units, phases, features or driver publication. Its rows cover the
+representable fact groups without assigning electrical semantics to JSON shape,
+so none selects an element. All qualification and Gateway publication remain
 unverified. eeBUS output binding implementation belongs to its driver owner.
-
-| Family / owner and source | Native evidence / qualification | SemReg field / service | Target evidence | Mandatory gaps | Direction | Status; loss or withholding reason | Proven / Hypothesis / Unknown; concrete falsifier | Public evidence locator |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| eeBUS raw typed readings / eebusreg, E | Null, bool, string, safe signed integers; decimal/exponent JSON numbers and out-of-safe-range integers preserved as strings; Go floats rejected; unqualified | None evidenced; numeric text alone is not infrastructure quantity | T? | G; native measurement type, unit, phase, direction | RO representation | Supported raw representation; electrical projection withheld | Proven container rules; Unknown electrical interpretation | E `canonicalTypedValueV1WithDepth` |
-| eeBUS raw structured readings / eebusreg, E | Bounded arrays/string-keyed objects, nested typed values; clone access and canonical hashing; unqualified | None evidenced; source association must accompany value | T? | G; source/feature/address association and public native contract | RO representation | Supported raw structure; no endpoint identity from value hash | Proven `Value`, `Clone`, `ComputeHash`; Unknown producer/publication | E named methods, `decodeTypedJSONTokenV1` |
-| eeBUS unavailable/invalid raw input / eebusreg, E | Duplicate keys, invalid Unicode, excess bounds and unsupported values rejected; null is representable; unqualified | No missing-to-zero rule | T? | G; explicit missing/invalid/stale semantics | RO representation | Withheld on rejection; no fabricated fresh reading | Proven validation; Unknown downstream state transition | E `NewTypedValueV1`, `decodeTypedJSONV1WithDepth` |
-| Electrical composition metadata / all source owners, S/M/E | Accuracy, enumerated measurement types/count, physical topology and target PowerMode not established by these views; unqualified | Text dimensions and units cannot supply these facts | T? | G in full | RO metadata | Unavailable in reviewed source slice; do not invent defaults | Proven evidence gap in these views; Unknown broader support | S metadata tables; M builders; E container; B “Production gate”; R `validate_composition` |
 
 E's existing secret rejection is a representation safety behavior; this ticket
 adds no credential, principal, authentication or permission check. It introduces
 no authorization gate; authentication/authorization remain later lifecycle work.
+
+### Energy plane
+
+| Key: catalog element (planes) | Provenance: family / owner and source | Native evidence / qualification | SemReg field / service | Target evidence | Mandatory gaps | Direction | Status; loss or withholding reason | Proven / Hypothesis / Unknown; concrete falsifier | Public evidence locator |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `infrastructure.ac.active_power` (energy) | Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.ac.active_power`, W, signed; phase | T?; ActivePower shape only in R | G; phase reference, sign convention | RO | Candidate; preserve negative values | Proven signed definition; Hypothesis projection; falsified by unsigned target or opposite sign convention | S `fields`, bounds ±10^7 |
+| `infrastructure.ac.active_power` (energy) | SunSpec meter / modbusreg, M | `W`, `WphA/B/C`, W, signed integer or float definitions; unqualified | Phase candidate `infrastructure.ac.active_power`; total not a direct nonnegative import/export field | T? | G; sign/flow convention; total split | RO | Candidate phase; total split withheld | Proven typed points; Hypothesis; falsified by sign loss or applying total to one phase | M point builders, `meterFieldID`; S `fields` |
+| `infrastructure.ac.apparent_power` (energy) | Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.ac.apparent_power`, VA; phase | T? | G; phase association | RO | Candidate; VA is not W | Proven definition; Hypothesis; falsified by target requiring active power instead of apparent | S `fields` |
+| `infrastructure.ac.current` (energy) | Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.ac.current`, A; phase | TC? | G; current kind and phase association | RO | Candidate; AC current is not automatically ActiveCurrent | Proven definition; Hypothesis; falsified by required active-current component absent from source | S `fields`; L `target.active_current_attribute` |
+| `infrastructure.ac.current` (energy) | SunSpec integer/scaled and float meter / modbusreg, M | Defined `A`, `AphA/B/C`, A; unqualified | Phase points candidate `infrastructure.ac.current` / phase; total has no evidenced aggregate-current correspondence | TC? | G; total versus phase; current kind | RO | Candidate phase; total withheld; no total-to-phase relabeling | Proven points; Hypothesis mapping; falsified by negative current outside S bounds or non-active current semantics | M point builders, `meterFieldID` |
+| `infrastructure.ac.frequency` (energy) | Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.ac.frequency`, Hz; grid_connection | T? | G; measurement location | RO | Candidate; no duplicate per-phase inference | Proven definition; Hypothesis; falsified by incompatible target scope | S `fields` |
+| `infrastructure.ac.frequency` (energy) | SunSpec meter / modbusreg, M | `Hz`, Hz; unqualified | Candidate `infrastructure.ac.frequency` / grid_connection | T? | G; grid connection identity | RO | Candidate; preserve scope | Proven point; Hypothesis; falsified by an unassociated measurement location | M point builders, `meterFieldID` |
+| `infrastructure.ac.power_factor` (energy) | Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.ac.power_factor`, ratio ±1; grid_connection | T? | G; factor/sign interpretation | RO | Candidate; ratio is not percent | Proven definition; Hypothesis; falsified by differing target factor convention | S `fields` |
+| `infrastructure.ac.power_factor` (energy) | SunSpec meter / modbusreg, M | `PF`, `PFphA/B/C`; integer unit Pct, float unit PF; unqualified | Total candidate `infrastructure.ac.power_factor` / grid_connection; phase-specific field unavailable in S | T? | G; percent-to-ratio and float convention | RO | Candidate total only with public conversion contract; phase withheld | Proven unit difference; Hypothesis; falsified by treating integer percent as ratio or assuming float convention from its label | M point builders; S `fields` |
+| `infrastructure.ac.reactive_power` (energy) | Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.ac.reactive_power`, var, signed; phase | T? | G; reactive convention | RO | Candidate; no absolute-value conversion | Proven definition; Hypothesis; falsified by loss of sign or incompatible reactive convention | S `fields`, bounds ±10^7 |
+| `infrastructure.ac.reactive_power` (energy) | SunSpec meter / modbusreg, M | `VAR`, `VARphA/B/C`, var; unqualified | Phase candidate `infrastructure.ac.reactive_power`; total directional split not established | T? | G; reactive sign/flow | RO | Candidate phase; total split withheld | Proven points; Hypothesis; falsified by unresolved sign convention or fabricated import/export split | M point builders, `meterFieldID` |
+| `infrastructure.ac.voltage` (energy) | Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.ac.voltage`, V; phase | T? | G; line-neutral versus line-line | RO | Candidate; reference must be evidenced | Proven definition; Hypothesis; falsified by target requiring a different voltage reference | S `fields` |
+| `infrastructure.ac.voltage` (energy) | SunSpec meter / modbusreg, M | `PhV`, `PhVphA/B/C`, V; unqualified | Phase candidate `infrastructure.ac.voltage` / phase; average withheld | T? | G; neutral reference, phase identity | RO | Candidate phase; no average-as-phase default | Proven line-neutral IDs; Hypothesis; falsified by missing neutral/reference identity | M `meterFieldID`, point builders |
+| `infrastructure.energy.import` (energy); `infrastructure.energy.export` (energy) | Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.energy.import`, `infrastructure.energy.export`, kWh; meter | T?; energy target Unknown | G; accumulation/reset basis, flow reference | RO; import/export separate | Candidate; never merge counters | Proven definitions; Hypothesis; falsified by swapped direction or incompatible accumulation interval | S `fields` |
+| `infrastructure.energy.import` (energy); `infrastructure.energy.export` (energy) | SunSpec meter / modbusreg, M | `TotWhImp/Exp`, total and phase A/B/C, Wh; unqualified | Total candidate `infrastructure.energy.import/export`, kWh / meter; phase dimension not represented by those fields | T?; energy target Unknown | G; counter/reset basis; exact Wh-to-kWh conversion | RO; separate import/export | Candidate totals; phases withheld unless a dimension-preserving contract is supplied | Proven points/units; Hypothesis; falsified by Wh labeled kWh, reversed direction, or collapsed phases | M point builders, `meterFieldID`; S `fields` |
+| `infrastructure.power.apparent` (energy) | Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.power.apparent`, VA; grid_connection | T? | G; aggregate scope | RO | Candidate; not the phase field | Proven definition; Hypothesis; falsified by target requiring phase-local rather than aggregate data | S `fields` |
+| `infrastructure.power.apparent` (energy); `infrastructure.ac.apparent_power` (energy) | SunSpec meter / modbusreg, M | `VA`, `VAphA/B/C`, VA; unqualified | Candidate `infrastructure.power.apparent` / grid_connection and `infrastructure.ac.apparent_power` / phase | T? | G; scope, nonnegative validation | RO | Candidate; retain total/phase distinction | Proven points; Hypothesis; falsified by negative source or wrong aggregation scope | M point builders, `meterFieldID`; S `fields` |
+| `infrastructure.power.import_active` (energy); `infrastructure.power.export_active` (energy) | Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.power.import_active`, `infrastructure.power.export_active`, nonnegative W; grid_connection | T? | G; flow convention and derivation | RO; import/export separate | Candidate; not interchangeable with signed phase power | Proven definitions; Hypothesis; falsified by source net power without a documented split rule | S `fields` |
+| `infrastructure.power.import_reactive` (energy); `infrastructure.power.export_reactive` (energy) | Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.power.import_reactive`, `infrastructure.power.export_reactive`, nonnegative var; grid_connection | T? | G; reactive flow convention | RO; import/export separate | Candidate; preserve direction | Proven definitions; Hypothesis; falsified by unresolved quadrant or sign convention | S `fields` |
+
+### Diagnostic and control planes
+
+Status facts are diagnostic; `infrastructure.status.interlock` is also in the
+control plane, and that membership records no command support.
+
+| Key: catalog element (planes) | Provenance: family / owner and source | Native evidence / qualification | SemReg field / service | Target evidence | Mandatory gaps | Direction | Status; loss or withholding reason | Proven / Hypothesis / Unknown; concrete falsifier | Public evidence locator |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `infrastructure.status.breaker` (diagnostic); `infrastructure.status.interlock` (control, diagnostic) | Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.status.breaker` closed/open, `infrastructure.status.interlock` active/clear; circuit | T? | G; source status interpretation | RO | Withheld from metering; status is not command support | Proven symbols; Unknown target/publication | S `fields`, `index` |
+| `infrastructure.status.connection` (diagnostic); `infrastructure.status.readiness` (diagnostic) | Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.status.connection` connected/disconnected, `infrastructure.status.readiness` not_ready/ready; grid_connection | T? | G; status provenance | RO | Withheld; readiness does not grant endpoint admission | Proven symbols; Unknown target/publication | S `fields`; R `evaluate` |
+| `infrastructure.status.fault` (diagnostic) | Electrical infrastructure / SemReg, S | Native unavailable; unqualified | `infrastructure.status.fault` clear/present; site | T? | G; fault interpretation | RO | Withheld; do not collapse arbitrary native events | Proven symbols; Unknown native mapping/target | S `fields` |
+| `infrastructure.status.fault` (diagnostic) | SunSpec meter / modbusreg, M | `Evt` bitfield; Power_Failure, Under_Voltage, Low_PF, Over_Current, Over_Voltage, Missing_Sensor, reserved/OEM symbols; unqualified | `infrastructure.status.fault` is not an accepted event mapping | T? | G; event interpretation, unknown bits | RO | Withheld; preserve raw event bits and symbols rather than boolean collapse | Proven symbolic definitions; Unknown target/status mapping | M `meterEventSymbols`, `meterFieldID` |
+
+### Physical, energy, control, diagnostic and provenance structure
+
+The services and read capabilities carry the planes of their scope. They
+are text dimensions; membership in the physical plane is not evidence of
+wiring, and cross-source relations come from the core relation types, not
+from this page.
+
+| Key: catalog element (planes) | Provenance: family / owner and source | Native evidence / qualification | SemReg field / service | Target evidence | Mandatory gaps | Direction | Status; loss or withholding reason | Proven / Hypothesis / Unknown; concrete falsifier | Public evidence locator |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `infrastructure.service.site` (physical, energy, diagnostic); `infrastructure.service.grid_connection` (physical, energy, diagnostic); `infrastructure.service.feeder` (energy); `infrastructure.service.circuit` (physical, energy, control, diagnostic); `infrastructure.service.phase` (physical, energy); `infrastructure.service.meter` (physical, energy, provenance); `infrastructure.capability.read.site` (physical, energy, diagnostic); `infrastructure.capability.read.grid_connection` (physical, energy, diagnostic); `infrastructure.capability.read.feeder` (energy); `infrastructure.capability.read.circuit` (physical, energy, control, diagnostic); `infrastructure.capability.read.phase` (physical, energy); `infrastructure.capability.read.meter` (physical, energy, provenance) | Infrastructure grouping / SemReg, S | No physical topology evidence; unqualified | site/grid_connection/feeder/circuit/phase/meter services and read capabilities | T?; Power Topology is lock metadata only | G; physical relations and endpoint allocation | RO | Supported semantic grouping; physical topology unavailable | Proven text dimensions/services; Unknown hardware graph | S `dimensions`, `services`, `capabilities` |
+
+### Absent from the catalog or no element selected
+
+These rows keep their native evidence. An absent element is a gap for the
+semantic owner, not a reason to borrow a nearby element.
+
+| Key: catalog element (planes) | Provenance: family / owner and source | Native evidence / qualification | SemReg field / service | Target evidence | Mandatory gaps | Direction | Status; loss or withholding reason | Proven / Hypothesis / Unknown; concrete falsifier | Public evidence locator |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Absent from the catalog | SunSpec meter / modbusreg, M | `PPV`, `PPVphAB/BC/CA` and `PhVphAB/BC/CA` aliases, V; unqualified | No explicit line-pair field in S; phase voltage requires further contract | T? | G; line-pair representation | RO | Withheld; line-line cannot silently become line-neutral | Proven alias IDs; Unknown safe semantic/target mapping | M `integerMeterSunSpecPoints`, `meterFieldID` |
+| Absent from the catalog | SunSpec meter / modbusreg, M | `TotVAhImp/Exp`, total and phase A/B/C, VAh; unqualified | No apparent-energy field in S | T? | G; apparent-energy semantics | RO; separate import/export | Withheld; not active kWh | Proven point definitions; Unknown target/semantic mapping | M point builders, `meterFieldID` |
+| Absent from the catalog | SunSpec meter / modbusreg, M | `TotVArhImpQ1/Q2`, `TotVArhExpQ3/Q4`, total and phase A/B/C, varh; unqualified | No reactive-energy/quadrant field in S | T? | G; quadrant and accumulation basis | RO; separate quadrants/flows | Withheld; preserve `Ph`/`ph` native aliases and canonical phase IDs | Proven point and alias definitions; Unknown target mapping | M float/integer builders, `meterFieldID` |
+| Absent from the catalog | SunSpec integer meter / modbusreg, M | `A_SF`, `V_SF`, `Hz_SF`, `W_SF`, `VA_SF`, `VAR_SF`, `PF_SF`, `TotWh_SF`, `TotVAh_SF`, `TotVArh_SF`; unqualified | No standalone measurement correspondence | T? | G; decode/scale evidence | RO metadata | Supported native metadata; withheld as measurements; scale is not Accuracy | Proven scale links; Unknown executed decoding/target | M `integerMeterSunSpecPoints` |
+| Absent from the catalog | SunSpec meter / modbusreg, M | `ID`, `L` header and family-specific required flags; unqualified | No physical source identity or topology derived | T? | G; source/model instance identity | RO metadata | Supported native layout; topology unavailable | Proven header/mandatory sets; Unknown physical composition | M `meterHeaderSunSpecPoints`, `markMeterMandatory`, `meterMandatoryPoints` |
+| No element selected: native fact Unknown | eeBUS raw typed readings / eebusreg, E | Null, bool, string, safe signed integers; decimal/exponent JSON numbers and out-of-safe-range integers preserved as strings; Go floats rejected; unqualified | None evidenced; numeric text alone is not infrastructure quantity | T? | G; native measurement type, unit, phase, direction | RO representation | Supported raw representation; electrical projection withheld | Proven container rules; Unknown electrical interpretation | E `canonicalTypedValueV1WithDepth` |
+| No element selected: native fact Unknown | eeBUS raw structured readings / eebusreg, E | Bounded arrays/string-keyed objects, nested typed values; clone access and canonical hashing; unqualified | None evidenced; source association must accompany value | T? | G; source/feature/address association and public native contract | RO representation | Supported raw structure; no endpoint identity from value hash | Proven `Value`, `Clone`, `ComputeHash`; Unknown producer/publication | E named methods, `decodeTypedJSONTokenV1` |
+| No element selected: native fact Unknown | eeBUS unavailable/invalid raw input / eebusreg, E | Duplicate keys, invalid Unicode, excess bounds and unsupported values rejected; null is representable; unqualified | No missing-to-zero rule | T? | G; explicit missing/invalid/stale semantics | RO representation | Withheld on rejection; no fabricated fresh reading | Proven validation; Unknown downstream state transition | E `NewTypedValueV1`, `decodeTypedJSONV1WithDepth` |
+| Absent from the catalog | Electrical composition metadata / all source owners, S/M/E | Accuracy, enumerated measurement types/count, physical topology and target PowerMode not established by these views; unqualified | Text dimensions and units cannot supply these facts | T? | G in full | RO metadata | Unavailable in reviewed source slice; do not invent defaults | Proven evidence gap in these views; Unknown broader support | S metadata tables; M builders; E container; B “Production gate”; R `validate_composition` |
 
 ## Proposed projection rules and manual synthetic review
 
