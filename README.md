@@ -11,7 +11,7 @@ bridge. The currently accepted mapping supplies only `evse.ac.current`; it does
 not supply the mandatory Electrical Sensor composition facts. Therefore no
 Helianthus Electrical Sensor endpoint can be enabled by this repository today.
 
-## Adopted baseline and retained legacy tooling
+## Adopted baseline
 
 Helianthus adopts [go-fabric](https://github.com/SukramJ/go-fabric), an
 Apache-2.0 pure-Go semantic port of matter.js, on its **Matter 1.6.1** data
@@ -20,14 +20,14 @@ The full inventory includes storage, thermal/HVAC, PV, EVSE, metering,
 infrastructure, pumps, thermostats, valves/mixers and bridge composition; it is
 not reduced to an initial Electrical Sensor bridge.
 
-The checked-in [SDK lock](sdk/matter-sdk.lock.json), strict validator and
-[hosted job](.github/workflows/sdk-baseline.yml) still describe the legacy
-connectedhomeip fork and Matter 1.7 target. Their replacement is owner-controlled
-work and has **not** happened here. Legacy build/fixture results cannot qualify
-go-fabric. Neither a complete retained normative model corpus, a Linux arm64
-build nor an accepted production profile is supplied by this documentation.
+The checked-in [SDK lock](sdk/matter-sdk.lock.json) pins the go-fabric module
+path, release tag and module zip checksum from the module files. The strict
+validator rejects any other identity. The
+[hosted job](.github/workflows/sdk-baseline.yml) runs the Go adapter in module
+mode. A complete retained normative model corpus, a Linux arm64 build and an
+accepted production profile are not supplied by this documentation.
 
-See the [baseline and legacy fixture procedure](docs/SDK_BASELINE.md),
+See the [baseline](docs/SDK_BASELINE.md),
 [full inventory reconciliation](docs/target-profile/inventory-completeness.md)
 and [named deferrals and snapshot gaps](docs/adoption/matter-161-deferred.md).
 Matter 1.7 remains draft direction for later pre-1.0 review; nothing is stable
@@ -46,13 +46,14 @@ review of applicable terms and authorization for each contribution remain pendin
 ## Fail-closed production admission
 
 `runtime.production_readiness.evaluate()` has no production-admission path in
-this revision. The reviewed lock pins
-`accepted_runtime_composition_profile_sha256` to `null`, so every invocation
+this revision. The admission baseline keeps
+`accepted_runtime_composition_profile_sha256` unset, so a matching invocation
 denies endpoint allocation, including calls that provide self-asserted
-`accepted` metadata or passed build JSON. A future reviewed change may replace
-that immutable absent state with an exact canonical profile digest, after which
-the unmodified lock, matching independently verified SDK build/fixture result, and matching accepted
-profile would all be required. That profile must provide evidenced Descriptor
+`accepted` metadata or passed build JSON. The module pin is not that baseline.
+A future reviewed change may replace that unset state with an exact canonical
+profile digest, after which the unmodified admission baseline, matching
+independently verified SDK build result, and matching accepted profile would
+all be required. That profile must provide evidenced Descriptor
 and Power Topology composition plus Electrical Power Measurement `PowerMode`,
 `NumberOfMeasurementTypes`, a non-empty `Accuracy` list, and its nullable
 `ActivePower` fact. `ActiveCurrent` remains optional at the Matter target level.
@@ -64,16 +65,15 @@ evidence and separately reviewed with its exact digest added to the lock.
 
 The closure choices remain open: extend accepted native/SemReg evidence for the
 mandatory metadata; choose another standards-valid, evidence-backed target; or
-keep this mapping withheld. The upstream fixture is a complete SDK sample; its
-metadata must never become Helianthus production semantics.
+keep this mapping withheld. Sample metadata must never become Helianthus
+production semantics.
 
 ## Safety and non-claims
 
 This repository does not commission or join a real fabric, use production
 credentials, call a live Gateway, deploy a node, prove Matter conformance or
 certification, establish ecosystem interoperability, or qualify real hardware.
-Its fixture uses temporary test storage and cleans itself up. See
-[AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
+See [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Semantic snapshot source
 

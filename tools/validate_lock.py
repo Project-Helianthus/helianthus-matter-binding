@@ -1,40 +1,139 @@
 #!/usr/bin/env python3
-"""Strictly validate the Matter SDK lock and optional checked-out evidence."""
+"""Validate the module pin and the immutable workflow action references."""
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
-import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
+LOCK_FIELDS = frozenset({
+    "schema_version",
+    "accepted_runtime_composition_profile_sha256",
+    "sdk",
+    "mapping",
+    "target",
+})
+SDK_FIELDS = frozenset({"provider", "module", "release_tag", "checksum", "model"})
+TARGET_FIELDS = frozenset({
+    "device_type",
+    "power_topology_cluster",
+    "electrical_power_measurement_cluster",
+    "active_current_attribute",
+})
+EXPECTED_TARGET = {
+    "device_type": {"name": "Electrical Sensor", "id": "0x0510", "revision": 1},
+    "power_topology_cluster": {"name": "Power Topology", "id": "0x009C", "revision": 1},
+    "electrical_power_measurement_cluster": {"name": "Electrical Power Measurement", "id": "0x0090", "revision": 3},
+    "active_current_attribute": {"name": "ActiveCurrent", "id": "0x0005", "optional": True},
+}
 
-from runtime.production_readiness import validate_lock  # noqa: E402
+
+def module_requirement(text: str) -> tuple[str, str] | None:
+    """Return the one direct require line. A require block is not a pin."""
+    found: list[tuple[str, str]] = []
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) == 3 and parts[0] == "require":
+            found.append((parts[1], parts[2]))
+    if len(found) != 1:
+        return None
+    return found[0]
 
 
-def git(checkout: Path, *args: str) -> str:
-    result = subprocess.run(["git", "-C", str(checkout), *args], check=False, text=True, capture_output=True)
-    if result.returncode:
-        raise ValueError(result.stderr.strip() or "git validation failed")
-    return result.stdout.strip()
+def recorded_checksum(text: str, module: str, version: str) -> str | None:
+    """Return the single h1 for an exact module version, or None when it is not unique."""
+    found: list[str] = []
+    for line in text.splitlines():
+        parts = line.split()
+        if len(parts) == 3 and parts[0] == module and parts[1] == version and parts[2].startswith("h1:"):
+            found.append(parts[2])
+    if len(found) != 1:
+        return None
+    return found[0]
 
 
-def validate_checkout(lock: dict, checkout: Path) -> list[str]:
+def pin_constant_reasons(lock: dict) -> list[str]:
     reasons: list[str] = []
-    try:
-        if git(checkout, "rev-parse", "HEAD") != lock["sdk"]["commit"]:
-            reasons.append("SDK checkout HEAD differs from locked commit")
-        items = [lock["sdk"]["data_model"]["spec_sha"], lock["sdk"]["data_model"]["spec_tag"], *lock["sdk"]["blobs"]]
-        for item in items:
-            if git(checkout, "rev-parse", f"HEAD:{item['path']}") != item["blob"]:
-                reasons.append(f"SDK blob differs: {item['path']}")
-    except (OSError, ValueError) as exc:
-        reasons.append(f"SDK checkout cannot be validated: {exc}")
+    if type(lock["schema_version"]) is not int or lock["schema_version"] != 1:
+        reasons.append("lock schema is unsupported")
+    if lock["accepted_runtime_composition_profile_sha256"] is not None:
+        reasons.append("accepted runtime composition profile pin must stay unset")
+    if lock["mapping"] is not None:
+        reasons.append("mapping must stay unset")
+    return reasons
+
+
+def pin_section_reasons(lock: dict) -> list[str]:
+    reasons: list[str] = []
+    if not isinstance(lock["sdk"], dict) or set(lock["sdk"]) != SDK_FIELDS:
+        reasons.append("sdk pin fields differ from the module pin")
+    if not isinstance(lock["target"], dict) or set(lock["target"]) != TARGET_FIELDS:
+        reasons.append("target fields differ from the module pin")
+    return reasons
+
+
+def pin_shape_reasons(lock: Any) -> list[str]:
+    if not isinstance(lock, dict) or set(lock) != LOCK_FIELDS:
+        return ["lock fields differ from the module pin"]
+    reasons = pin_constant_reasons(lock)
+    reasons.extend(pin_section_reasons(lock))
+    return reasons
+
+
+def provider_and_model_reasons(sdk: dict) -> list[str]:
+    reasons: list[str] = []
+    if sdk["provider"] != "go-fabric":
+        reasons.append("sdk provider must be go-fabric")
+    if sdk["model"] != {"name": "Matter", "version": "1.6.1"}:
+        reasons.append("sdk model must be Matter 1.6.1")
+    return reasons
+
+
+def requirement_reasons(sdk: dict, sums: str, requirement: tuple[str, str] | None) -> list[str]:
+    if requirement is None:
+        return ["module requirement is absent"]
+    module, tag = requirement
+    checksum = recorded_checksum(sums, module, tag)
+    reasons: list[str] = []
+    if sdk["module"] != module:
+        reasons.append("sdk module must match the module requirement exactly")
+    if sdk["release_tag"] != tag:
+        reasons.append("sdk release tag must match the module requirement exactly")
+    if checksum is None:
+        reasons.append("module zip checksum is absent")
+    elif sdk["checksum"] != checksum:
+        reasons.append("sdk checksum must be the module zip checksum")
+    return reasons
+
+
+def pin_identity_reasons(sdk: dict, root: Path) -> list[str]:
+    sums = (root / "go.sum").read_text(encoding="utf-8")
+    requirement = module_requirement((root / "go.mod").read_text(encoding="utf-8"))
+    reasons = provider_and_model_reasons(sdk)
+    reasons.extend(requirement_reasons(sdk, sums, requirement))
+    return reasons
+
+
+def pin_target_reasons(target: dict) -> list[str]:
+    reasons: list[str] = []
+    for key, expected in EXPECTED_TARGET.items():
+        if target.get(key) != expected:
+            reasons.append(f"target {key} differs from the module pin")
+    return reasons
+
+
+def validate_module_pin(lock: Any, root: Path) -> list[str]:
+    """Require the lock to be the module path, tag and zip checksum, and the adopted target."""
+    reasons = pin_shape_reasons(lock)
+    if reasons:
+        return reasons
+    reasons.extend(pin_identity_reasons(lock["sdk"], root))
+    reasons.extend(pin_target_reasons(lock["target"]))
     return reasons
 
 
@@ -291,26 +390,18 @@ def validate_workflow_pins(directory: Path) -> list[str]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--lock", type=Path, default=ROOT / "sdk" / "matter-sdk.lock.json")
-    parser.add_argument("--sdk-checkout", type=Path)
-    parser.add_argument("--mapping", type=Path, help="Optional checked-out mapping file to hash")
     args = parser.parse_args()
     try:
         lock = json.loads(args.lock.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         print(f"FAIL: cannot read lock: {exc}", file=sys.stderr)
         return 1
-    reasons = list(validate_lock(lock))
+    reasons = list(validate_module_pin(lock, ROOT))
     reasons.extend(validate_workflow_pins(ROOT / ".github" / "workflows"))
-    if not reasons and args.sdk_checkout:
-        reasons.extend(validate_checkout(lock, args.sdk_checkout))
-    if not reasons and args.mapping:
-        observed = hashlib.sha256(args.mapping.read_bytes()).hexdigest()
-        if observed != lock["mapping"]["sha256"]:
-            reasons.append("mapping SHA-256 differs from lock")
     if reasons:
         print("FAIL: " + "; ".join(reasons), file=sys.stderr)
         return 1
-    print("PASS: Matter SDK lock and requested evidence match the reviewed baseline")
+    print("PASS: module pin matches the module files and workflow actions are immutable")
     return 0
 
 

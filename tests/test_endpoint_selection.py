@@ -41,7 +41,8 @@ THIRD = "synthetic.ventilation-family.electrical-power"
 
 
 def load_lock() -> dict:
-    return json.loads(LOCK.read_text(encoding="utf-8"))
+    """Admission fixtures use the unchanged in-module baseline. The file pin is separate."""
+    return copy.deepcopy(production_readiness.EXPECTED_LOCK)
 
 
 def synthetic_composition(lock: dict, profile_id: str = "synthetic-electrical-sensor-profile-a") -> dict:
@@ -158,7 +159,9 @@ class EndpointSelectionTest(unittest.TestCase):
         self.assertNotIn(LEDGER_KEY, self.store.data)
         self.assertNotIn(LEDGER_KEY, self.store.writes)
         self.assertEqual(self.identities.calls, 0)
-        self.assertIsNone(load_lock()[PIN])
+        disk = json.loads(LOCK.read_text(encoding="utf-8"))
+        self.assertIsNone(disk[PIN])
+        self.assertFalse(production_readiness.evaluate(disk, self.composition, self.build).permitted)
 
     def test_absent_or_mismatched_inputs_stay_withheld_even_with_an_admitted_pin(self) -> None:
         selector = self.selector()

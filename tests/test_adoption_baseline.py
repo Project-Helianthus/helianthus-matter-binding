@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import copy
 import hashlib
+import json
 from pathlib import Path
 import sys
 import tempfile
@@ -15,20 +16,53 @@ from unittest.mock import Mock, patch
 from runtime import adoption_baseline as baseline
 from runtime import production_readiness
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+import validate_lock as pin_checker  # noqa: E402
+from validate_lock import validate_module_pin  # noqa: E402
 
-# These values are synthetic supplied claims, never a selected SDK pin.
+CHECKOUT_KEYS = ("repository", "commit", "upstream_merge", "data_model", "blobs")
+
+
+def direct_requirement(root: Path = ROOT) -> tuple[str, str]:
+    """Read the single direct module requirement. A block entry is not that pin."""
+    found = [
+        (parts[1], parts[2])
+        for line in (root / "go.mod").read_text(encoding="utf-8").splitlines()
+        if (parts := line.split()) and len(parts) == 3 and parts[0] == "require"
+    ]
+    if len(found) != 1:
+        raise AssertionError("direct module requirement must be exactly one require line")
+    return found[0]
+
+
+def sum_checksum(module: str, tag: str, *, go_mod: bool, root: Path = ROOT) -> str:
+    """Return the one zip or go.mod h1 recorded for the module requirement."""
+    version = f"{tag}/go.mod" if go_mod else tag
+    values: list[str] = []
+    for line in (root / "go.sum").read_text(encoding="utf-8").splitlines():
+        parts = line.split()
+        if len(parts) == 3 and parts[0] == module and parts[1] == version and parts[2].startswith("h1:"):
+            values.append(parts[2])
+    if len(values) != 1:
+        raise AssertionError("module sum must record exactly one matching checksum")
+    return values[0]
+
+
+# Targets and retained references are synthetic. Identity fields come from the module pin.
 def checksum(label: str) -> str:
     return "h1:" + base64.b64encode(hashlib.sha256(label.encode()).digest()).decode()
 
 
 def proposal() -> dict:
+    sdk = json.loads((ROOT / "sdk" / "matter-sdk.lock.json").read_text(encoding="utf-8"))["sdk"]
     return {
         "schema_version": 1,
-        "provider": "go-fabric",
-        "module": "github.com/SukramJ/go-fabric",
-        "release_tag": "v0.0.1-synthetic",
-        "checksum": checksum("synthetic archive"),
-        "model": {"name": "Matter", "version": "1.6.1"},
+        "provider": sdk["provider"],
+        "module": sdk["module"],
+        "release_tag": sdk["release_tag"],
+        "checksum": sdk["checksum"],
+        "model": copy.deepcopy(sdk["model"]),
         "targets": ["synthetic-electrical-family", "synthetic-topology-family"],
         "deferred_features": ["synthetic-future-model-feature"],
         "missing_evidence": ["independent source replay", "platform results"],
@@ -159,11 +193,18 @@ class AdoptionBaselineTest(unittest.TestCase):
                     item = proposal()
                     item[field] = value
                     self.assertFalse(baseline.evaluate_adoption_baseline(item).proposal_valid)
-        for tag in ("v0.0.2", "v1.2.3-rc.1"):
+        module, tag = direct_requirement()
+        for value in ("v0.0.2", "v1.2.3-rc.1", ".".join(["v" + tag.split(".")[0].removeprefix("v"), *tag.split(".")[1:2]])):
             item = proposal()
-            item["release_tag"] = tag
-            item["checksum"] = checksum(tag)
-            self.assertTrue(baseline.evaluate_adoption_baseline(item, evidence(item)).proposal_valid)
+            item["release_tag"] = value
+            item["checksum"] = checksum(value)
+            self.assertFalse(baseline.evaluate_adoption_baseline(item, evidence(item)).proposal_valid)
+        item = proposal()
+        item["module"] = module.casefold()
+        self.assertFalse(baseline.evaluate_adoption_baseline(item, evidence(item)).proposal_valid)
+        item = proposal()
+        item["checksum"] = sum_checksum(module, tag, go_mod=True)
+        self.assertFalse(baseline.evaluate_adoption_baseline(item, evidence(item)).proposal_valid)
 
     def test_rosters_and_explicit_missing_inventory(self) -> None:
         for field in ("targets", "deferred_features", "missing_evidence"):
@@ -251,15 +292,47 @@ class AdoptionBaselineTest(unittest.TestCase):
         allocate.assert_not_called()
         self.assertEqual((lock, composition, build), original)
 
+    def test_lock_names_module_path_tag_and_zip_checksum(self) -> None:
+        """The lock pin is the module path, tag and zip checksum, with no checkout identity.
+
+        Fields varied, and the production comparison a wrong value must fail:
+        provider — equality with the provider name skipped.
+        module — case-insensitive or prefix comparison.
+        release_tag — major.minor comparison, or a range.
+        checksum — zip checksum skipped, or the go.mod checksum accepted in its place.
+        model name and model version — model omitted from the comparison.
+        checkout keys — a repository or commit key treated as part of the pin.
+        """
+        lock_text = (ROOT / "sdk" / "matter-sdk.lock.json").read_text(encoding="utf-8")
+        sdk = json.loads(lock_text)["sdk"]
+        module, tag = direct_requirement()
+        self.assertEqual(sdk.get("provider"), "go-fabric")
+        self.assertEqual(sdk.get("module"), module)
+        self.assertNotEqual(sdk.get("module"), module.casefold())
+        self.assertFalse(str(sdk.get("module", "")).startswith(module + "/"))
+        self.assertEqual(sdk.get("release_tag"), tag)
+        self.assertNotEqual(sdk.get("release_tag"), ".".join(tag.removeprefix("v").split(".")[:2]))
+        self.assertEqual(sdk.get("checksum"), sum_checksum(module, tag, go_mod=False))
+        self.assertNotEqual(sdk.get("checksum"), sum_checksum(module, tag, go_mod=True))
+        self.assertEqual(sdk.get("model"), {"name": "Matter", "version": "1.6.1"})
+        self.assertNotIn("connectedhomeip", lock_text)
+        for key in CHECKOUT_KEYS:
+            self.assertNotIn(key, sdk)
+
     def test_disposable_owned_source_mutants_are_killed(self) -> None:
         source = Path(baseline.__file__).read_text()
         mutations = {
             **{f"drop join {field}": (
                 "for field in IDENTITY_FIELDS)", f'for field in IDENTITY_FIELDS if field != "{field}")'
             ) for field in KEY_FIELDS},
-            "accept wrong provider": ('proposal["provider"] != "go-fabric"', "False"),
-            "accept wrong module": ('proposal["module"] != "github.com/SukramJ/go-fabric"', "False"),
-            "accept wrong model": ('proposal["model"] != {"name": "Matter", "version": "1.6.1"}', "False"),
+            **{f"skip pinned {field}": (
+                "for field in _PIN_FIELDS:",
+                f'for field in tuple(name for name in _PIN_FIELDS if name != "{field}"):',
+            ) for field in ("provider", "module", "release_tag", "checksum", "model")},
+            "casefold pinned fields": (
+                "if proposal[field] != pin[field]:",
+                "if str(proposal[field]).casefold() != str(pin[field]).casefold():",
+            ),
             "structure qualifies B1-B8": ('(f"B{number}", "Unknown")', '(f"B{number}", "Proven")'),
             "structure admits": ("permitted: bool = False", "permitted: bool = True"),
         }
@@ -269,22 +342,169 @@ class AdoptionBaselineTest(unittest.TestCase):
                 path = Path(directory) / "adoption_baseline.py"
                 path.write_text(source.replace(old, new))
                 module = types.ModuleType("runtime._adoption_mutant")
+                module.__dict__["__file__"] = baseline.__file__
                 with patch.dict(sys.modules, {module.__name__: module}):
                     exec(compile(path.read_text(), str(path), "exec"), module.__dict__)
                     evaluate = module.evaluate_adoption_baseline
                     if name.startswith("drop join"):
                         with self.assertRaises(AssertionError):
                             self.assert_identity_contract(evaluate)
-                    elif name.startswith("accept wrong"):
-                        field = name.removeprefix("accept wrong ")
+                    elif name.startswith("skip pinned") or name == "casefold pinned fields":
+                        field = "module" if name == "casefold pinned fields" else name.removeprefix("skip pinned ")
                         item = proposal()
-                        item[field] = CHANGED[field]
+                        item[field] = item["module"].casefold() if field == "module" and name.startswith("casefold") else CHANGED[field]
                         with self.assertRaises(AssertionError):
                             self.assertFalse(evaluate(item, evidence(item)).proposal_valid)
                     else:
                         item = proposal()
                         with self.assertRaises(AssertionError):
                             self.assert_nonadmission(evaluate(item, evidence(item)))
+
+
+def shifted_tag(tag: str) -> str:
+    """Return the same module line with only the last numeric component changed."""
+    numbers = [int(part) for part in tag.removeprefix("v").split(".")]
+    numbers[-1] += 1
+    return "v" + ".".join(str(number) for number in numbers)
+
+
+def with_value(document: dict, path: tuple[str, ...], value: object) -> dict:
+    changed = copy.deepcopy(document)
+    cursor = changed
+    for key in path[:-1]:
+        cursor = cursor[key]
+    cursor[path[-1]] = value
+    return changed
+
+
+class ModulePinTest(unittest.TestCase):
+    """Each identity field is rejected alone, and each listed mutation lets that field through."""
+
+    def setUp(self) -> None:
+        self.lock = json.loads((ROOT / "sdk" / "matter-sdk.lock.json").read_text(encoding="utf-8"))
+        self.module, self.tag = direct_requirement()
+        self.assertEqual(validate_module_pin(self.lock, ROOT), [])
+
+    def test_each_identity_and_target_field_is_required(self) -> None:
+        """Vary provider, module, release_tag, checksum, model name, model version and each target field."""
+        digest = hashlib.sha256(b"synthetic profile").hexdigest()
+        samples = {
+            "provider": with_value(self.lock, ("sdk", "provider"), "other-provider"),
+            "module case": with_value(self.lock, ("sdk", "module"), self.module.casefold()),
+            "module prefix": with_value(self.lock, ("sdk", "module"), self.module + "/extra"),
+            "release_tag patch": with_value(self.lock, ("sdk", "release_tag"), shifted_tag(self.tag)),
+            "release_tag range": with_value(self.lock, ("sdk", "release_tag"), ">=" + self.tag),
+            "zip checksum": with_value(self.lock, ("sdk", "checksum"), sum_checksum(self.module, self.tag, go_mod=True)),
+            "model name": with_value(self.lock, ("sdk", "model", "name"), "Other"),
+            "model version": with_value(self.lock, ("sdk", "model", "version"), "1.7"),
+            "mapping": with_value(self.lock, ("mapping",), {"path": "synthetic"}),
+            "profile pin": with_value(self.lock, ("accepted_runtime_composition_profile_sha256",), digest),
+            "checkout key": with_value(self.lock, ("sdk", "commit"), "synthetic"),
+        }
+        for name, section, field, value in (
+            ("device name", "device_type", "name", "Other Sensor"),
+            ("device id", "device_type", "id", "0x0511"),
+            ("device revision", "device_type", "revision", 2),
+            ("topology name", "power_topology_cluster", "name", "Other Topology"),
+            ("topology id", "power_topology_cluster", "id", "0x009D"),
+            ("topology revision", "power_topology_cluster", "revision", 2),
+            ("measurement name", "electrical_power_measurement_cluster", "name", "Other Measurement"),
+            ("measurement id", "electrical_power_measurement_cluster", "id", "0x0091"),
+            ("measurement revision", "electrical_power_measurement_cluster", "revision", 4),
+            ("current name", "active_current_attribute", "name", "OtherCurrent"),
+            ("current id", "active_current_attribute", "id", "0x0006"),
+            ("current optional", "active_current_attribute", "optional", False),
+        ):
+            samples[name] = with_value(self.lock, ("target", section, field), value)
+        for name, sample in samples.items():
+            with self.subTest(field=name):
+                self.assertTrue(validate_module_pin(sample, ROOT), name)
+
+    def test_absent_or_replaced_checksum_mutation_is_killed(self) -> None:
+        """checksum — comparison skipped when the zip line is absent, or the go.mod line used in its place."""
+        source = Path(pin_checker.__file__).read_text(encoding="utf-8")
+        mutations = {
+            "absent zip line": (
+                'if checksum is None:\n        reasons.append("module zip checksum is absent")',
+                "if checksum is None:\n        return []",
+            ),
+            "go.mod checksum": (
+                "recorded_checksum(sums, module, tag)",
+                'recorded_checksum(sums, module, f"{tag}/go.mod")',
+            ),
+        }
+        for name, (old, new) in mutations.items():
+            with self.subTest(mutant=name), tempfile.TemporaryDirectory() as directory:
+                self.assertEqual(source.count(old), 1)
+                checker = load_checker(source.replace(old, new))
+                if name == "go.mod checksum":
+                    with self.assertRaises(AssertionError):
+                        self.assertEqual(checker(self.lock, ROOT), [])
+                    continue
+                root = directory_without_zip(Path(directory), self.module, self.tag)
+                with self.assertRaises(AssertionError):
+                    self.assertTrue(checker(self.lock, root))
+
+    def test_identity_comparison_mutants_are_killed(self) -> None:
+        """provider, module, release_tag, model, mapping, profile pin, checkout key and target identity."""
+        source = Path(pin_checker.__file__).read_text(encoding="utf-8")
+        digest = hashlib.sha256(b"synthetic profile").hexdigest()
+        mutations = {
+            "skip provider": ('sdk["provider"] != "go-fabric"', "False"),
+            "casefold module": ("sdk[\"module\"] != module", "sdk[\"module\"].casefold() != module.casefold()"),
+            "prefix module": ("sdk[\"module\"] != module", "not sdk[\"module\"].startswith(module)"),
+            "major minor tag": (
+                'sdk["release_tag"] != tag',
+                'sdk["release_tag"].split(".")[:2] != tag.split(".")[:2]',
+            ),
+            "skip model": ('sdk["model"] != {"name": "Matter", "version": "1.6.1"}', "False"),
+            "allow extra sdk keys": ("set(lock[\"sdk\"]) != SDK_FIELDS", "not SDK_FIELDS <= set(lock[\"sdk\"])"),
+            "skip mapping": ('lock["mapping"] is not None', "False"),
+            "skip profile pin": (
+                'lock["accepted_runtime_composition_profile_sha256"] is not None',
+                "False",
+            ),
+            "revision only target": (
+                "if target.get(key) != expected:",
+                "if isinstance(expected, dict) and expected.get(\"revision\") is not None and "
+                "target.get(key, {}).get(\"revision\") != expected.get(\"revision\"):",
+            ),
+        }
+        samples = {
+            "skip provider": with_value(self.lock, ("sdk", "provider"), "other-provider"),
+            "casefold module": with_value(self.lock, ("sdk", "module"), self.module.casefold()),
+            "prefix module": with_value(self.lock, ("sdk", "module"), self.module + "/extra"),
+            "major minor tag": with_value(self.lock, ("sdk", "release_tag"), shifted_tag(self.tag)),
+            "skip model": with_value(self.lock, ("sdk", "model", "version"), "1.7"),
+            "allow extra sdk keys": with_value(self.lock, ("sdk", "commit"), "synthetic"),
+            "skip mapping": with_value(self.lock, ("mapping",), {"path": "synthetic"}),
+            "skip profile pin": with_value(self.lock, ("accepted_runtime_composition_profile_sha256",), digest),
+            "revision only target": with_value(self.lock, ("target", "device_type", "name"), "Other Sensor"),
+        }
+        for name, (old, new) in mutations.items():
+            with self.subTest(mutant=name):
+                self.assertEqual(source.count(old), 1)
+                checker = load_checker(source.replace(old, new))
+                with self.assertRaises(AssertionError):
+                    self.assertTrue(checker(samples[name], ROOT))
+
+
+def load_checker(source: str):
+    module = types.ModuleType("tools._pin_mutant")
+    module.__dict__["__file__"] = pin_checker.__file__
+    exec(compile(source, pin_checker.__file__, "exec"), module.__dict__)
+    return module.validate_module_pin
+
+
+def directory_without_zip(root: Path, module: str, tag: str) -> Path:
+    (root / "go.mod").write_text((ROOT / "go.mod").read_text(encoding="utf-8"), encoding="utf-8")
+    kept = [
+        line
+        for line in (ROOT / "go.sum").read_text(encoding="utf-8").splitlines()
+        if line.split()[:2] != [module, tag]
+    ]
+    (root / "go.sum").write_text("\n".join(kept) + "\n", encoding="utf-8")
+    return root
 
 
 if __name__ == "__main__":

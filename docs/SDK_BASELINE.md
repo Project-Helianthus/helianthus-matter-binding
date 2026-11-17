@@ -1,21 +1,23 @@
 # Matter SDK baseline and offline fixture
 
-## Adopted SDK and transition boundary
+## Adopted SDK
 
-Helianthus adopts [SukramJ/go-fabric](https://github.com/SukramJ/go-fabric)
+Helianthus adopts [go-fabric](https://github.com/SukramJ/go-fabric)
 under Apache-2.0: a pure-Go semantic port of matter.js using the Matter **1.6.1**
-data model. This is the selected SDK direction now, not a future candidate or
-an implementation-readiness verdict. It is not certified. Public source links
-locate upstream material; no remote source was fetched for this reconciliation.
+data model. This is the selected SDK, not an implementation-readiness verdict.
+It is not certified. Public source links locate upstream material; no remote
+source was fetched for this reconciliation.
 
-The checked-in [lock](../sdk/matter-sdk.lock.json), validator and
-[hosted workflow](../.github/workflows/sdk-baseline.yml) remain **legacy**:
-they select the [connectedhomeip fork](https://github.com/AryaHassanli/connectedhomeip)
-and its Matter 1.7 target. The legacy semantic artifact remains at its
-[public owner](https://github.com/Project-Helianthus/helianthus-docs-semantic/blob/main/api/v1/targets/matter-1.7-ballot-0.9-v1.json).
-No dependency pin, workflow, runtime admission code or accepted semantic mapping
-is migrated by this documentation. Legacy evidence remains attributable to that
-implementation; it cannot qualify the adopted SDK.
+The checked-in [lock](../sdk/matter-sdk.lock.json) is the module pin.
+`sdk.provider` is `go-fabric`, `sdk.module` is `github.com/SukramJ/go-fabric`,
+`sdk.release_tag` is `v0.22.2`, and `sdk.checksum` is the module zip checksum
+on the matching `go.sum` line (not the `go.mod` checksum). `sdk.model` is
+Matter 1.6.1. The [validator](../tools/validate_lock.py) requires those fields
+to match the module files exactly and rejects any other identity.
+`accepted_runtime_composition_profile_sha256` stays unset, and `mapping` stays
+unset. The public semantic owner has not published an accepted Matter 1.6.1
+target. The [hosted workflow](../.github/workflows/sdk-baseline.yml) runs the
+Go adapter job only.
 
 ## Bounded source presence, separate from qualification
 
@@ -27,11 +29,11 @@ composition, target mappings, generated behavior and build results remain
 [go-fabric source](https://github.com/SukramJ/go-fabric/tree/main) is a locator,
 not retained normative-corpus evidence or independent replay.
 
-| Component | Legacy identity / prior inventory | Adopted source identity | Disposition and limit |
+| Component | Previously recorded identity | Adopted source identity | Disposition and limit |
 | --- | --- | --- | --- |
-| Electrical Sensor `0x0510` | revision 2 in legacy lock | revision 1 | Changed; Electrical Alarm support deferred |
-| Power Topology `0x009C` | revision 2 in legacy lock | revision 1 | Changed; ElectricalCircuit deferred |
-| Electrical Power Measurement `0x0090` | revision 3 in legacy lock | revision 3 | Unchanged revision; features and composition still need evidence |
+| Electrical Sensor `0x0510` | revision 2 | revision 1 | Changed; Electrical Alarm support deferred |
+| Power Topology `0x009C` | revision 2 | revision 1 | Changed; ElectricalCircuit deferred |
+| Electrical Power Measurement `0x0090` | revision 3 | revision 3 | Unchanged revision; features and composition still need evidence |
 | Electrical Energy Measurement | prior full identity Unknown | revision 2 | Unknown comparison; source presence does not accept energy mappings |
 | Thermostat | prior full identity Unknown | revision 11 | Unknown comparison; heating/cooling and command closure unresolved |
 | Device Energy Management (DEM) | prior full identity Unknown | revision 4 | Unknown comparison; PowerRangeAdjustment absent in inspected snapshot |
@@ -46,42 +48,18 @@ source row remains in the [full inventory](target-profile/inventory-completeness
 The sole accepted mapping remains `evse.ac.current`, with optional
 `ActiveCurrent` `0x0005`; it supplies no complete endpoint composition.
 
-## Hosted reproduction — retained legacy procedure
+## Hosted adapter job
 
-`.github/workflows/sdk-baseline.yml` clones the exact fork object into a clean
-Ubuntu runner, initializes recursive submodules, verifies detached HEAD and all
-locked blobs, then uses that checkout's scripts to build:
+`.github/workflows/sdk-baseline.yml` runs `gofabric-adapter` ("Go adapter
+(go-fabric, module mode)"). That job installs the pinned Ruff, runs the lock
+validator, the unit tests and the Python rule check, then runs the module-mode
+adapter commands with and without the `gofabric` build tag. The commands are
+listed in [AGENTS.md](../AGENTS.md). There is no second job.
 
-1. `linux-x64-all-devices-clang`, including code-driven
-   `examples/all-devices-app/posix`;
-2. `linux-x64-chip-tool-clang`;
-3. focused Electrical Power Measurement and Power Topology cluster test roots.
-
-The fixture starts `all-devices-app --device electrical-sensor:1` with a unique
-temporary KVS path, the SDK's public test passcode and discriminator, and a
-temporary controller storage path. It then invokes the SDK's EPM test which
-commissions the sample and verifies an `ActiveCurrent` read after the sample's
-test event. The fixture does not use the SDK runner's broad `--factory-reset`;
-all explicit sample fabric and controller state belongs to its unique temporary
-directory. The direct `chip-tool` calls bind `TMPDIR` to that directory, assert
-that their default and alpha commissioner storage plus platform KVS were created
-there, and verify an external sentinel was unchanged. The pinned Linux binaries
-also use compile-time `/tmp`
-defaults for generic factory, configuration, and counter bookkeeping; the
-workflow therefore runs on a fresh hosted runner and does not treat those files
-as reusable Helianthus state.
-The script removes owned storage, terminates the directly started app through an EXIT
-trap, and runs SDK helpers in a separately owned process group that is terminated
-and reaped on success, failure, or timeout. It never reads a private network,
-fabric, or credential.
-
-The fixture proves only an upstream SDK sample's descriptor/device/cluster
-composition and controller interaction. It cannot qualify a Helianthus runtime,
-make a production profile accepted, prove a real fabric path, or establish
-Matter conformance or certification.
-
-Legacy build success is not established by this documentation. The retained
-hosted procedure and any results apply only to the legacy lock, not go-fabric.
+The job does not check out another SDK, build a sample application or run a
+controller fixture. A green job is Go adapter evidence for the pinned module.
+It cannot qualify a Helianthus runtime, make a production profile accepted,
+prove a real fabric path, or establish Matter conformance or certification.
 No hosted, Linux arm64, platform or physical qualification was performed here.
 
 ## Production gate
@@ -93,11 +71,12 @@ Topology composition. Electrical Power Measurement requires a non-unknown `Power
 It cannot supply the missing facts by analogy or default.
 
 `runtime/production_readiness.py` has no production-admission path in this
-revision. The reviewed lock fixes
-`accepted_runtime_composition_profile_sha256` to `null`, so every call is
-denied before caller-supplied profile or build fields can be trusted. A future
-reviewed revision may add an exact canonical-profile digest; only then would it
-require all of:
+revision. Its embedded baseline keeps
+`accepted_runtime_composition_profile_sha256` unset, so a lock that matches
+that baseline is denied before caller-supplied profile or build fields can be
+trusted. The module pin is a different object and does not open admission.
+A future reviewed revision may add an exact canonical-profile digest to that
+baseline; only then would it require all of:
 
 - the unmodified lock;
 - matching independently verified SDK build and fixture evidence;
@@ -111,9 +90,8 @@ admissible closure options are to extend accepted evidence, select an
 evidence-backed standards-valid target, or withhold the existing mapping.
 
 The adopted source identities above do not relax this boundary. The complete
-retained normative model corpus, accepted semantic target evidence and actual
-lock migration remain external provisioning/owner work. Source inspection,
-legacy sample success and documentation checks establish neither Matter
-conformance nor certification, interoperability, arm64 behavior or production
-admission. Native evidence and partial last-known-good state remain preserved;
-eBUS MCP compatibility and GraphQL parity are unchanged.
+retained normative model corpus and accepted semantic target evidence remain
+external provisioning work. Source inspection and documentation checks establish
+neither Matter conformance nor certification, interoperability, arm64 behavior
+or production admission. Native evidence and partial last-known-good state
+remain preserved; eBUS MCP compatibility and GraphQL parity are unchanged.

@@ -1,25 +1,26 @@
-"""Offline proposal parsing for an owner-controlled SDK migration.
+"""Offline proposal parsing against the pinned module identity.
 
 Input schema (version 1) is an object with provider, module, release_tag,
 checksum (Go h1 form), model ({name, version}), targets (nonempty string
 roster), deferred_features (possibly empty string roster), and missing_evidence
 (possibly empty string roster). All fields are required; rosters are ordered,
-unique identities. This schema declares supplied identities, not SDK support.
+unique identities. Provider, module, release tag, checksum and model are valid
+only when they equal the sdk object in the module pin. Other well-formed
+values are rejected.
 
 Optional retained evidence has exactly identity (all seven identity fields)
 and retained_inputs (nonempty string references). References are retained as
-claims only: this module never reads them or verifies source/checksum content.
+claims only: this module never reads them or verifies archive bytes.
 Even joined evidence leaves provenance and every B1-B8 qualification Unknown.
 The adapter always denies admission and also returns the unchanged production
-evaluator's independent decision. No pin is selected and no allocation occurs.
+evaluator's independent decision. No allocation occurs.
 """
 
 from __future__ import annotations
 
-import base64
-import binascii
-import re
+import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from runtime import production_readiness
@@ -29,10 +30,7 @@ IDENTITY_FIELDS = (
     "provider", "module", "release_tag", "checksum", "model", "targets",
     "deferred_features",
 )
-_TAG = re.compile(
-    r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
-    r"(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?"
-)
+_PIN_FIELDS = ("provider", "module", "release_tag", "checksum", "model")
 
 
 @dataclass(frozen=True)
@@ -73,25 +71,13 @@ def _roster(value: Any, *, nonempty: bool = False) -> bool:
     )
 
 
-def _tag(value: Any) -> bool:
-    match = _TAG.fullmatch(value) if isinstance(value, str) else None
-    if match is None:
-        return False
-    prerelease = match.group(4)
-    return prerelease is None or all(
-        not (part.isdigit() and len(part) > 1 and part.startswith("0"))
-        for part in prerelease.split(".")
-    )
-
-
-def _checksum(value: Any) -> bool:
-    if not isinstance(value, str) or not value.startswith("h1:"):
-        return False
-    try:
-        decoded = base64.b64decode(value[3:], validate=True)
-    except (ValueError, binascii.Error):
-        return False
-    return len(decoded) == 32 and base64.b64encode(decoded).decode("ascii") == value[3:]
+def module_pin() -> dict[str, Any]:
+    """Return the sdk object recorded by the module pin."""
+    path = Path(__file__).resolve().parents[1] / "sdk" / "matter-sdk.lock.json"
+    sdk = json.loads(path.read_text(encoding="utf-8"))["sdk"]
+    if not isinstance(sdk, dict):
+        raise ValueError("module pin is not an object")
+    return sdk
 
 
 def _identity_matches(identity: dict, proposal: dict) -> bool:
@@ -106,7 +92,7 @@ def evaluate_adoption_baseline(
     composition: Any = None,
     build_evidence: Any = None,
 ) -> AdoptionResult:
-    """Parse supplied claims without I/O, pin changes, qualification or admission.
+    """Parse supplied claims without qualification or admission.
 
     Missing and malformed proposal fields are errors. Missing retained evidence
     is explicit evidence debt, not a structural error. Mismatched or malformed
@@ -124,16 +110,10 @@ def evaluate_adoption_baseline(
     else:
         if type(proposal["schema_version"]) is not int or proposal["schema_version"] != 1:
             errors.append("proposal schema is unsupported")
-        if proposal["provider"] != "go-fabric":
-            errors.append("proposal provider must be go-fabric")
-        if proposal["module"] != "github.com/SukramJ/go-fabric":
-            errors.append("proposal module must identify go-fabric exactly")
-        if proposal["model"] != {"name": "Matter", "version": "1.6.1"}:
-            errors.append("proposal model must identify Matter 1.6.1 exactly")
-        if not _tag(proposal["release_tag"]):
-            errors.append("proposal release_tag must be an exact release tag")
-        if not _checksum(proposal["checksum"]):
-            errors.append("proposal checksum must be a supplied canonical Go h1 checksum")
+        pin = module_pin()
+        for field in _PIN_FIELDS:
+            if proposal[field] != pin[field]:
+                errors.append(f"proposal {field} must be the pinned value")
         for field in ("targets", "deferred_features", "missing_evidence"):
             if not _roster(proposal[field], nonempty=field == "targets"):
                 errors.append(f"proposal {field} must be a unique string roster")

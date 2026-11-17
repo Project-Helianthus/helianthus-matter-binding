@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- The SDK lock pins the go-fabric module path, release tag and module zip
+  checksum recorded by the module files. The hosted workflow runs the Go
+  adapter job only. `scripts/checkout_sdk.sh`, `scripts/run_upstream_fixture.sh`
+  and `scripts/run_owned_group.sh` are removed with that job. Admission stays
+  fail closed.
+
 - The go-fabric module requirement is v0.22.2, and the Go directive is 1.27.4,
   the version that release declares. The adapter no longer sets a reannounce
   switch: the built-in responder stays off and the periodic interface
