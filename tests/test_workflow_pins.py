@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import sys
 import tempfile
@@ -17,6 +18,28 @@ from validate_lock import validate_workflow_pins  # noqa: E402
 SHA = hashlib.sha1(b"synthetic immutable action reference").hexdigest()
 
 
+def direct_requirement() -> tuple[str, str]:
+    found = [
+        (parts[1], parts[2])
+        for line in (ROOT / "go.mod").read_text(encoding="utf-8").splitlines()
+        if len(parts := line.split()) == 3 and parts[0] == "require"
+    ]
+    if len(found) != 1:
+        raise AssertionError("direct module requirement must be exactly one require line")
+    return found[0]
+
+
+def zip_checksum(module: str, tag: str) -> str:
+    values = [
+        parts[2]
+        for line in (ROOT / "go.sum").read_text(encoding="utf-8").splitlines()
+        if len(parts := line.split()) == 3 and parts[0] == module and parts[1] == tag and parts[2].startswith("h1:")
+    ]
+    if len(values) != 1:
+        raise AssertionError("module zip checksum is absent")
+    return values[0]
+
+
 def check(*uses_lines: str) -> list[str]:
     with tempfile.TemporaryDirectory() as temporary:
         directory = Path(temporary)
@@ -29,24 +52,27 @@ class WorkflowPinTest(unittest.TestCase):
     def test_repository_workflows_are_pinned(self) -> None:
         self.assertEqual(validate_workflow_pins(ROOT / ".github" / "workflows"), [])
 
-    def test_legacy_sdk_checks_remain_separate(self) -> None:
-        workflow = (ROOT / ".github/workflows/sdk-baseline.yml").read_text()
-        self.assertTrue(workflow.startswith("name: Matter Go adapter and legacy SDK validation\n"))
-        start = workflow.index("\n  legacy-sdk-fixture:\n")
-        following = re.search(r"^  [^ \n]", workflow[start + 1 :][1:], re.M)
-        legacy = workflow[start:] if following is None else workflow[start : start + 2 + following.start()]
-        self.assertIn("    name: Legacy SDK fixture (connectedhomeip)\n", legacy)
-        for command in (
-            'scripts/checkout_sdk.sh "$RUNNER_TEMP/connectedhomeip"',
-            "source scripts/bootstrap.sh",
-            "./scripts/build/build_examples.py --target linux-x64-all-devices-clang build",
-            "./scripts/build/build_examples.py --target linux-x64-chip-tool-clang build",
-            "out/focused-tests/tests/TestElectricalPowerMeasurementCluster",
-            "out/focused-tests/tests/TestPowerTopologyCluster",
-            'scripts/run_upstream_fixture.sh "$RUNNER_TEMP/connectedhomeip"',
-        ):
-            with self.subTest(command=command):
-                self.assertIn(command, legacy)
+    def test_lock_names_module_path_tag_and_zip_checksum(self) -> None:
+        """The hosted pin is the module path, tag and zip checksum, and the workflow has no checkout.
+
+        Fields varied, and the production comparison a wrong value must fail:
+        module — case-insensitive comparison.
+        release_tag — anything other than the module requirement's tag.
+        checksum — the go.mod checksum accepted in place of the zip checksum.
+        checkout text — a repository name remaining in the lock or workflow.
+        """
+        lock_text = (ROOT / "sdk" / "matter-sdk.lock.json").read_text(encoding="utf-8")
+        sdk = json.loads(lock_text)["sdk"]
+        module, tag = direct_requirement()
+        self.assertEqual(sdk.get("module"), module)
+        self.assertNotEqual(module, module.casefold())
+        self.assertEqual(sdk.get("release_tag"), tag)
+        self.assertEqual(sdk.get("checksum"), zip_checksum(module, tag))
+        workflow = (ROOT / ".github/workflows/sdk-baseline.yml").read_text(encoding="utf-8")
+        self.assertTrue(workflow.startswith("name: Matter Go adapter validation\n"))
+        for banned in ("connectedhomeip", "checkout_sdk.sh", "run_upstream_fixture.sh", "run_owned_group.sh"):
+            self.assertNotIn(banned, lock_text)
+            self.assertNotIn(banned, workflow)
 
     def test_sha_pin_with_version_comment_passes(self) -> None:
         self.assertEqual(check(f"- uses: actions/checkout@{SHA} # v4.4.0"), [])

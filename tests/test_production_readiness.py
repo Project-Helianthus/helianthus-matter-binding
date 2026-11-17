@@ -7,15 +7,16 @@ import json
 import unittest
 from pathlib import Path
 
+from runtime import production_readiness
 from runtime.production_readiness import evaluate, validate_build_evidence, validate_composition
 
 
 ROOT = Path(__file__).resolve().parents[1]
-LOCK = ROOT / "sdk" / "matter-sdk.lock.json"
 
 
 def load_lock() -> dict:
-    return json.loads(LOCK.read_text(encoding="utf-8"))
+    """Admission fixtures use the unchanged in-module baseline."""
+    return copy.deepcopy(production_readiness.EXPECTED_LOCK)
 
 
 def accepted_composition(lock: dict) -> dict:
@@ -98,6 +99,10 @@ class ProductionReadinessTest(unittest.TestCase):
         del build["targets"]["upstream_electrical_sensor_fixture"]
         self.assertFalse(evaluate(self.lock, self.composition, build).permitted)
         self.assertIn("build evidence omits upstream_electrical_sensor_fixture", validate_build_evidence(self.lock, build))
+
+    def test_module_pin_file_cannot_enable_the_gate(self) -> None:
+        disk = json.loads((ROOT / "sdk" / "matter-sdk.lock.json").read_text(encoding="utf-8"))
+        self.assertFalse(evaluate(disk, self.composition, self.build).permitted)
 
     def test_mismatched_attribute_identifier_cannot_enable_the_gate(self) -> None:
         lock = copy.deepcopy(self.lock)

@@ -8,12 +8,19 @@ The umbrella remains open. Nothing here is stable before Helianthus 1.0.
 
 The module requirement in `go.mod` is the current release, recorded in
 [Breaking changes absorbed by the installed module requirement](#breaking-changes-absorbed-by-the-installed-module-requirement).
-The sections after that record remain a proposal for the lock, evaluator and
-workflow change. They write no lock, evaluator, gate or workflow file.
+The [lock](../../sdk/matter-sdk.lock.json) now records that same identity:
+provider `go-fabric`, module `github.com/SukramJ/go-fabric`, release tag
+`v0.22.2`, and the module zip checksum from `go.sum`. The hosted workflow runs
+the Go adapter job only. `scripts/checkout_sdk.sh`,
+`scripts/run_upstream_fixture.sh` and `scripts/run_owned_group.sh` are not part
+of the tree. Admission in `runtime/production_readiness.py` is unchanged and
+stays fail closed.
 
-Approving or merging the proposal sections is not evidence that a checksum was
-verified, or that any B1–B8 or runtime qualification row passed. The installed
-module requirement is not that evidence either.
+The sections after the breaking-change record were a proposal for an earlier
+tag. They are not a second pin. Where they name another tag, that tag is not
+installed. Approving those sections is not evidence that a checksum was
+verified beyond the module files, or that any B1–B8 or runtime qualification
+row passed. The installed module requirement is not that evidence either.
 
 **Proven** below means only a bounded statement from the supplied graded go-fabric
 suitability report, or an observation of this repository's current source.
@@ -26,8 +33,8 @@ are separate from the missing/failed/unverified/pass states of the
 **Proven:** `go.mod` requires `github.com/SukramJ/go-fabric` at `v0.22.2`, and
 its `go` directive is `1.27.4`, the version that release's module file
 declares. The previous requirement was `v0.16.0`. `go.sum` records the
-release. No file inside go-fabric is changed. The fixture lock, the evaluator
-and the workflow are unchanged.
+release. No file inside go-fabric is changed. The lock records this requirement's
+module path, tag and zip checksum. The admission evaluator is unchanged.
 
 Each row is a breaking change the release notes mark between `v0.16.0` and
 `v0.22.2`, or a removal or comparability change those notes state in the same
@@ -79,25 +86,23 @@ Every command in the proposal sections is a specification: none was run for
 those sections. Every `<placeholder>` stays a placeholder until the owner
 supplies a verified value.
 
-Which exact go-fabric tag and module identity replace the fork lock?
+Which exact go-fabric tag and module identity does the lock record?
 
-**Proposed answer: inspect and retain `v0.13.12` first.** It is proposed because
-it is the only newly inspected exact tag in the supplied report. It is not assumed
-to be the latest release, and it is not qualified. The report observed upstream
-main one commit past that tag, and it inspected the tag by connector reads, not
-from a retained source bundle.
-
-If the owner selects any other tag, obtain a fresh six-axis triage first. Nothing
-from the report's inspection carries over, including model revisions, toolchain,
-license findings and runtime risks.
+**Installed answer: the module requirement `v0.22.2`.** The lock, `go.mod` and
+the zip checksum line in `go.sum` name the same module path and tag. An earlier
+note in this file suggested `v0.13.12` because that was the only newly inspected
+tag in one supplied report. That note is not the pin. The installed tag is not
+qualified by this document. Nothing from that report's inspection of another tag
+carries over, including model revisions, toolchain, license findings and runtime
+risks.
 
 | Identity field | Proposed value | Grade and limit |
 | --- | --- | --- |
 | Provider | `go-fabric` | Owner decision. |
 | Module path | `github.com/SukramJ/go-fabric` | Hypothesis. It is the public locator and the exact value [`runtime/adoption_baseline.py`](../../runtime/adoption_baseline.py) accepts. Confirm it against the `module` directive in the retained tag's `go.mod`. A difference stops the transition. |
-| Exact tag | `v0.13.12` | Proposal awaiting the owner. Use the canonical stable form, with no range, alias, moving branch or prerelease. |
-| Module zip checksum | `<owner-verified zip h1>` | **Missing.** No value is known to this document. |
-| `go.mod` checksum | `<owner-verified go.mod h1>` | **Missing.** No value is known to this document. |
+| Exact tag | `v0.22.2` | Installed module requirement. Not a qualification result. |
+| Module zip checksum | The `go.sum` line whose version is the tag alone | Installed. The lock must match that line, not the `go.mod` checksum line. |
+| `go.mod` checksum | The `go.sum` line whose version ends in `/go.mod` | Recorded by the module sum. It is not the lock checksum. |
 | Data model | Matter 1.6.1 | Owner decision; reported source identity for the proposed tag only. |
 | Declared Go version | 1.27.3 | Proven as a reported declaration for the proposed tag. Execution on any target is Unknown. |
 
@@ -196,23 +201,24 @@ module closure instead of narrowing it by guesswork.
 
 ## Owner-only changes traced to current consumers
 
-The module requirement in the section above is installed. Every path below is
-**external owner follow-through** for the separate lock change. No batch
-ticket owns these files, including `sdk/matter-sdk.lock.json`,
-`runtime/production_readiness.py` and `tools/validate_lock.py`.
+The module requirement and the lock pin are installed. The table records the
+consumer trace. `runtime/production_readiness.py` is unchanged: admission still
+compares a supplied lock with the baseline embedded in that module, and the
+unset profile pin keeps allocation denied. Rows for `scripts/checkout_sdk.sh`,
+`scripts/run_upstream_fixture.sh` and `scripts/run_owned_group.sh` describe
+files that are no longer in the tree. The hosted workflow keeps the adapter
+job and does not keep a second job.
 
 | Owner change | Current consumer | What the change must handle |
 | --- | --- | --- |
-| Replace `sdk/matter-sdk.lock.json` | `tools/validate_lock.py` reads it by default and compares it through `validate_lock`; `tests/test_production_readiness.py` loads it directly | Any edit without a matching evaluator edit denies and fails the validator. They must change together. |
+| `sdk/matter-sdk.lock.json` records the module pin | `tools/validate_lock.py` checks it against `go.mod` and the zip checksum in `go.sum` | The admission module is a separate comparison and is unchanged. |
 | Keep `go.mod` and `go.sum` at the repository root | Both files exist. `go.mod` requires go-fabric `v0.22.2` with Go `1.27.4`. Tagged packages under `sdkfabric/` import that module. | The lock change must keep the module path `github.com/Project-Helianthus/helianthus-matter-binding` and must not retarget or remove the installed requirement. Whether a `GO111MODULE=off` command still applies stays a Hypothesis. |
 | Migrate `runtime/production_readiness.py` | Imported by `tools/validate_lock.py`, `runtime/adoption_baseline.py` and both test modules below. `EXPECTED_LOCK` and its pinned constants, `validate_build_evidence`, `REQUIRED_BUILD_TARGETS` and `validate_composition` all assume a commit-pinned C++ SDK. | Follow the evaluator rules below. |
-| Migrate `tools/validate_lock.py` | `.github/workflows/sdk-baseline.yml`, `scripts/checkout_sdk.sh`, `AGENTS.md`, `CONTRIBUTING.md`. `validate_checkout` and `--sdk-checkout` read commit and blob fields. `--mapping` reads `mapping.sha256`. | Replace checkout validation with module validation. Leave `validate_workflow_pins` and `tests/test_workflow_pins.py` as they are: that check is not SDK-specific. |
-| Reconcile `runtime/adoption_baseline.py` | `tests/test_adoption_baseline.py`; it calls the real evaluator | Its `checksum` field binds the zip `h1`. Its tag check accepts prereleases while the build contract requires a stable tag, so apply the stricter rule at selection. Decide whether to tighten the check in this change. |
+| `tools/validate_lock.py` checks the module pin | `.github/workflows/sdk-baseline.yml` runs it. `validate_workflow_pins` is unchanged. | Checkout and mapping-file options are not part of the checker. |
+| `runtime/adoption_baseline.py` accepts only the pinned identity | `tests/test_adoption_baseline.py` calls the real evaluator | Provider, module, release tag, checksum and model must equal the lock. Another tag is rejected. |
 | Update `tests/test_production_readiness.py` | Its fixtures use `lock["sdk"]["commit"]`, `target_commit`, a Matter 1.7 profile identifier and the legacy build target names | Map each assertion to a successor or retire it with a stated reason. Do not weaken any denial assertion. |
 | Update `tests/test_adoption_baseline.py` | Its real-API test builds composition and build evidence from `EXPECTED_LOCK["sdk"]["commit"]` | Same rule. Its positive control must still pass, or the denial result proves nothing. |
-| Retire `scripts/checkout_sdk.sh` | Called by the hosted workflow. It hard-codes the fork remote and commit and calls `--sdk-checkout`. | Remove with the workflow step that calls it. |
-| Retire `scripts/run_upstream_fixture.sh` and `scripts/run_owned_group.sh`, with `tests/test_fixture_safety.py` | The hosted workflow runs the fixture; the fixture calls the group runner; the safety test reads both files | Remove the test with its subjects, or keep the group runner and its test if a replacement job uses them. Do not leave a test pointing at a removed file. |
-| Replace the SDK steps in `.github/workflows/sdk-baseline.yml` | Runs on every pull request. Its checkout, bootstrap, build and fixture steps all need the fork. | Keep the validator and unit test step. The SDK steps cannot pass once the lock changes, so they leave in the same change. The hosted qualification job replacing them is separately specified owner work under #59 direction 2. |
+| `scripts/checkout_sdk.sh`, `scripts/run_upstream_fixture.sh` and `scripts/run_owned_group.sh` | No hosted step calls them | Removed with the second hosted job. |
 | Update `examples/runtime-composition.profile.json` | Documented as the required shape in `docs/SDK_BASELINE.md`; carries `target_commit`, the legacy mapping and Electrical Sensor revision 2 | Move to the new identity join. It stays `proposed` with missing evidence. |
 | Reconcile documents | `docs/SDK_BASELINE.md`, `README.md`, `AGENTS.md`, `CONTRIBUTING.md`, `docs/adoption/matter-161-deferred.md`, `docs/adoption/reference-bridge.md`, `docs/adoption/gateway-library-composition.md`, `docs/PORTAL_ENDPOINT_LIFECYCLE.md`, `docs/go-fabric-build-qualification.md`, `docs/go-fabric-build-record-validator.md`, `docs/go-fabric-report-mechanics-harness.md`, `docs/go-fabric-runtime-qualification.md`, `docs/contribution-candidates/bridge.md`, `docs/contribution-candidates/eem.md` and the `docs/target-profile/` pages that cite the lock or evaluator | Each describes the lock as legacy or the evaluator's current shape. Re-read each one: "installed" must mean only the exact tag, never qualified. |
 
@@ -223,7 +229,8 @@ and this transition does not change it.
 
 ## Proposed lock shape
 
-This shape is a Hypothesis for owner review. It holds no real value:
+The installed lock keeps schema version 1, one zip checksum, and an unset
+mapping. The shape below was a hypothesis and is not installed:
 
 ```json
 {

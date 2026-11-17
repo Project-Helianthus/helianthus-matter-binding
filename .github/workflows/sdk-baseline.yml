@@ -1,4 +1,4 @@
-name: Matter Go adapter and legacy SDK validation
+name: Matter Go adapter validation
 
 on:
   pull_request:
@@ -37,47 +37,3 @@ jobs:
           go test -race -count=1 -timeout=5m ./...
           go vet -tags gofabric ./...
           go test -race -tags gofabric -count=1 -timeout=5m ./...
-
-  legacy-sdk-fixture:
-    name: Legacy SDK fixture (connectedhomeip)
-    needs: gofabric-adapter
-    runs-on: ubuntu-24.04
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
-        with:
-          python-version: "3.11"
-      - name: Install public Linux build prerequisites
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y \
-            avahi-daemon build-essential clang cmake curl default-jre git \
-            libavahi-client-dev libdbus-1-dev libevent-dev libglib2.0-dev \
-            libcairo2-dev libgirepository1.0-dev libjsoncpp-dev libnss-mdns libreadline-dev \
-            libssl-dev ninja-build pkg-config python3-dev python3-pip python3-venv \
-            unzip
-      - name: Clean recursive exact-SHA checkout
-        run: scripts/checkout_sdk.sh "$RUNNER_TEMP/connectedhomeip"
-      - name: Bootstrap exact SDK environment
-        working-directory: ${{ runner.temp }}/connectedhomeip
-        run: source scripts/bootstrap.sh
-      - name: Build code-driven app and controller
-        working-directory: ${{ runner.temp }}/connectedhomeip
-        run: |
-          source scripts/activate.sh
-          ./scripts/build/build_examples.py --target linux-x64-all-devices-clang build
-          ./scripts/build/build_examples.py --target linux-x64-chip-tool-clang build
-      - name: Build and run focused cluster tests
-        working-directory: ${{ runner.temp }}/connectedhomeip
-        run: |
-          source scripts/activate.sh
-          gn gen --check --fail-on-unused-args out/focused-tests --args='chip_build_tests=true chip_link_tests=true'
-          ninja -C out/focused-tests src/app/clusters/electrical-power-measurement-server/tests:tests
-          ninja -C out/focused-tests src/app/clusters/power-topology-server/tests:tests
-          out/focused-tests/tests/TestElectricalPowerMeasurementCluster
-          out/focused-tests/tests/TestPowerTopologyCluster
-      - name: Run bounded upstream Electrical Sensor fixture
-        run: |
-          sudo service avahi-daemon start
-          scripts/run_upstream_fixture.sh "$RUNNER_TEMP/connectedhomeip"

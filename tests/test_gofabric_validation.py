@@ -17,8 +17,6 @@ COMMANDS = (
 
 
 ADAPTER_JOB = ("gofabric-adapter", "Go adapter (go-fabric, module mode)")
-LEGACY_JOB = ("legacy-sdk-fixture", "Legacy SDK fixture (connectedhomeip)")
-GO_MARKERS = ("go vet", "go test", "gofabric", "GOWORK", "GO111MODULE")
 SDK_MARKERS = (
     "apt-get",
     "scripts/checkout_sdk.sh",
@@ -27,6 +25,7 @@ SDK_MARKERS = (
     "build_examples.py",
     "out/focused-tests",
     "run_upstream_fixture.sh",
+    "run_owned_group.sh",
     "connectedhomeip",
 )
 
@@ -59,23 +58,20 @@ def job_steps(job: str) -> list[str]:
 
 
 def validate_job_split(workflow: str) -> None:
-    """Require a go-fabric job and a legacy SDK job with distinct names and disjoint steps."""
+    """Require only the adapter job, with no external SDK checkout step."""
     jobs = split_jobs(workflow)
-    if set(jobs) != {ADAPTER_JOB[0], LEGACY_JOB[0]}:
-        raise ValueError("expected exactly the adapter job and the legacy SDK job")
-    adapter, legacy = jobs[ADAPTER_JOB[0]], jobs[LEGACY_JOB[0]]
-    if job_name(adapter) != ADAPTER_JOB[1] or job_name(legacy) != LEGACY_JOB[1]:
-        raise ValueError("job names must state what each job runs")
-    if re.findall(r"^    needs: (.*)$", legacy, re.M) != [ADAPTER_JOB[0]]:
-        raise ValueError("legacy SDK job must need the adapter job")
-    if re.findall(r"^    timeout-minutes: (.*)$", legacy, re.M) != ["90"]:
-        raise ValueError("legacy SDK job keeps its 90-minute bound")
-    for step in job_steps(legacy):
-        if any(marker in step for marker in GO_MARKERS):
-            raise ValueError("legacy SDK job must not run a go-fabric step")
+    if set(jobs) != {ADAPTER_JOB[0]}:
+        raise ValueError("expected only the adapter job")
+    adapter = jobs[ADAPTER_JOB[0]]
+    if job_name(adapter) != ADAPTER_JOB[1]:
+        raise ValueError("job name must state what the adapter job runs")
+    if re.findall(r"^    needs: (.*)$", adapter, re.M):
+        raise ValueError("adapter job must not wait on another job")
     for step in job_steps(adapter):
         if any(marker in step for marker in SDK_MARKERS):
-            raise ValueError("adapter job must not run a legacy SDK step")
+            raise ValueError("adapter job must not run an external SDK step")
+    if any(marker in workflow for marker in SDK_MARKERS):
+        raise ValueError("workflow must not select an external SDK checkout")
 
 
 def validate_adapter_step(workflow: str) -> None:
@@ -139,7 +135,7 @@ class GoFabricValidationTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     validate_adapter_step(self.workflow.replace(setting, replacement, 1))
 
-    def test_legacy_only_and_compile_only_substitutions_fail(self) -> None:
+    def test_external_fixture_and_compile_only_substitutions_fail(self) -> None:
         for replacement in (
             "GO111MODULE=off go test -race -count=1 ./...",
             "scripts/run_upstream_fixture.sh sdk",
@@ -156,7 +152,7 @@ class GoFabricValidationTest(unittest.TestCase):
             self.workflow.replace(COMMANDS[-1], COMMANDS[-1] + " || true", 1),
             self.workflow.replace("        env:\n", "        if: false\n        env:\n", 1),
             self.workflow.replace("        env:\n", "        continue-on-error: true\n        env:\n", 1),
-            self.workflow.replace(STEP, "Legacy SDK checks", 1),
+            self.workflow.replace(STEP, "External SDK checks", 1),
         ):
             with self.subTest(changed=changed):
                 with self.assertRaises(ValueError):
@@ -164,65 +160,39 @@ class GoFabricValidationTest(unittest.TestCase):
 
     def test_duplicate_step_fails(self) -> None:
         start = self.workflow.index("      - name: " + STEP)
-        end = self.workflow.index("\n  " + LEGACY_JOB[0] + ":\n", start) + 1
-        step = self.workflow[start:end]
+        step = self.workflow[start:]
+        if not step.endswith("\n"):
+            step += "\n"
         with self.assertRaises(ValueError):
-            validate_adapter_step(self.workflow[:end] + step + self.workflow[end:])
+            validate_adapter_step(self.workflow + step)
 
     def test_jobs_are_split_and_named(self) -> None:
         validate_job_split(self.workflow)
         jobs = split_jobs(self.workflow)
-        self.assertNotEqual(job_name(jobs[ADAPTER_JOB[0]]), job_name(jobs[LEGACY_JOB[0]]))
+        self.assertEqual(set(jobs), {ADAPTER_JOB[0]})
+        self.assertEqual(job_name(jobs[ADAPTER_JOB[0]]), ADAPTER_JOB[1])
 
     def test_each_job_id_and_name_is_required(self) -> None:
-        for job_id, name in (ADAPTER_JOB, LEGACY_JOB):
-            for changed in (
-                self.workflow.replace("\n  " + job_id + ":\n", "\n  renamed-job:\n", 1),
-                self.workflow.replace("    name: " + name + "\n", "    name: Matter checks\n", 1),
-                self.workflow.replace("    name: " + name + "\n", "", 1),
-            ):
-                with self.subTest(job=job_id, changed=changed):
-                    with self.assertRaises(ValueError):
-                        validate_job_split(changed)
-
-    def test_identical_job_names_fail(self) -> None:
-        changed = self.workflow.replace("    name: " + LEGACY_JOB[1], "    name: " + ADAPTER_JOB[1], 1)
-        with self.assertRaises(ValueError):
-            validate_job_split(changed)
-
-    def test_merged_single_job_fails(self) -> None:
-        changed = re.sub(r"\n  legacy-sdk-fixture:\n(    [^\n]*\n)*?    steps:\n", "\n", self.workflow, count=1)
-        self.assertNotEqual(changed, self.workflow)
-        with self.assertRaises(ValueError):
-            validate_job_split(changed)
-
-    def test_legacy_job_dependency_and_bound_are_required(self) -> None:
+        job_id, name = ADAPTER_JOB
         for changed in (
-            self.workflow.replace("    needs: " + ADAPTER_JOB[0] + "\n", "", 1),
-            self.workflow.replace("    timeout-minutes: 90\n", "    timeout-minutes: 30\n", 1),
+            self.workflow.replace("\n  " + job_id + ":\n", "\n  renamed-job:\n", 1),
+            self.workflow.replace("    name: " + name + "\n", "    name: Matter checks\n", 1),
+            self.workflow.replace("    name: " + name + "\n", "", 1),
         ):
             with self.subTest(changed=changed):
                 with self.assertRaises(ValueError):
                     validate_job_split(changed)
 
-    def test_legacy_job_contains_no_go_fabric_step(self) -> None:
-        start = self.workflow.index("      - name: " + STEP)
-        end = self.workflow.index("\n  " + LEGACY_JOB[0] + ":\n", start) + 1
-        step = self.workflow[start:end].rstrip("\n") + "\n"
-        changed = self.workflow + step
+    def test_second_job_fails(self) -> None:
+        extra = "\n  other-job:\n    name: Other checks\n    runs-on: ubuntu-24.04\n    steps:\n      - run: python3 tools/validate_lock.py\n"
         with self.assertRaises(ValueError):
-            validate_job_split(changed)
-        with self.assertRaises(ValueError):
-            validate_adapter_step(self.workflow[:start] + self.workflow[end:] + step)
+            validate_job_split(self.workflow + extra)
 
     def test_adapter_job_contains_no_sdk_step(self) -> None:
-        sdk_step = (
-            "      - name: Clean recursive exact-SHA checkout\n"
-            '        run: scripts/checkout_sdk.sh "$RUNNER_TEMP/connectedhomeip"\n'
-        )
-        end = self.workflow.index("\n  " + LEGACY_JOB[0] + ":\n")
+        sdk_step = "      - name: Clean checkout\n        run: scripts/checkout_sdk.sh destination\n"
+        changed = self.workflow.replace("    steps:\n", "    steps:\n" + sdk_step, 1)
         with self.assertRaises(ValueError):
-            validate_job_split(self.workflow[:end] + "\n" + sdk_step + self.workflow[end:])
+            validate_job_split(changed)
 
     def test_validation_policy_names_actual_commands(self) -> None:
         policy = (ROOT / "AGENTS.md").read_text()
@@ -231,9 +201,10 @@ class GoFabricValidationTest(unittest.TestCase):
             self.assertIn(command, policy)
         self.assertIn("only compiles", policy)
         self.assertIn("Hosted full tagged execution remains required", policy)
-        for job_id, name in (ADAPTER_JOB, LEGACY_JOB):
-            self.assertIn(f"`{job_id}`", policy)
-            self.assertIn(name, policy)
+        self.assertIn(f"`{ADAPTER_JOB[0]}`", policy)
+        self.assertIn(ADAPTER_JOB[1], policy)
+        for marker in SDK_MARKERS:
+            self.assertNotIn(marker, policy)
 
 
 if __name__ == "__main__":

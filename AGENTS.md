@@ -60,21 +60,14 @@ discovery or sockets. See [build qualification](docs/go-fabric-build-qualificati
 for the evidence boundary. Hosted full tagged execution remains required;
 compilation or static workflow tests do not establish hosted success.
 
-The hosted workflow "Matter Go adapter and legacy SDK validation" runs two
-jobs. `gofabric-adapter`, shown as "Go adapter (go-fabric, module mode)",
+The hosted workflow "Matter Go adapter validation" runs one job.
+`gofabric-adapter`, shown as "Go adapter (go-fabric, module mode)",
 installs the hash-pinned Ruff and runs the lock validator, the unit tests, the
 Python rule check and the adapter commands above.
-`legacy-sdk-fixture`, shown as "Legacy SDK fixture (connectedhomeip)", needs the
-adapter job and keeps the legacy SDK steps, because the lock, checkout script
-and fixture still select the legacy fork until the pin migration replaces them.
-A green legacy job is not go-fabric qualification.
 
-In that job, the retained legacy SDK steps perform the recursive locked checkout,
-check tracked blobs, build `all-devices-app` and `chip-tool`, run focused Electrical
-Power Measurement and Power Topology tests, and run the bounded upstream
-Electrical Sensor controller fixture. These Linux-runner checks provide legacy
-SDK evidence, not adopted Go adapter qualification. Neither suite establishes
-production admission, interoperability or certification.
+Those commands are the hosted qualification of the adopted Go adapter.
+Neither the unit tests nor the adapter commands establish production admission,
+interoperability or certification.
 
 Documentation is required for changed public ownership, Matter target semantics,
 readiness rules, fixtures, or safety boundaries. This repository has no declared
