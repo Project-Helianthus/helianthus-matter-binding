@@ -102,7 +102,7 @@ func TestAA12StaticBoundary(t *testing.T) {
 	}
 	used := selectors(t, f)
 	for _, banned := range []string{
-		fabricModule + "node.New", fabricModule + "node.Run",
+		fabricModule + "node.New", fabricModule + "node.Run", fabricModule + "node.Reannounce",
 		fabricModule + "mdns.NewZeroconf", fabricModule + "mdns.NewSubtypeResponder", fabricModule + "mdns.NewNoop",
 	} {
 		if used[banned] {
@@ -140,6 +140,9 @@ func TestAA12StaticFixture(t *testing.T) {
 	used := selectors(t, f)
 	if used[fabricModule+"node.New"] || used[fabricModule+"node.Run"] {
 		t.Error("fabrictest_test.go constructs a node outside the site")
+	}
+	if used[fabricModule+"fabrictest.UseWiFiCommissioning"] {
+		t.Error("fabrictest_test.go selects the removed Wi-Fi commissioning helper")
 	}
 	adds := 0
 	ast.Inspect(f, func(n ast.Node) bool {

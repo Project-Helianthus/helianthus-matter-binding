@@ -44,8 +44,9 @@ func (l *siteLauncher) Launch(cfg node.Config) (sdkfabric.Launched, error) {
 	l.mu.Lock()
 	l.launches++
 	l.mu.Unlock()
-	if cfg.Advertiser == nil || cfg.Advertiser != l.adv || !cfg.Network.MDNS.Off || !cfg.Network.Reannounce.Off ||
-		cfg.Network.TCP != (node.TCPConfig{}) || cfg.Client != nil || cfg.Observers.OnCommissioningComplete == nil {
+	if cfg.Advertiser == nil || cfg.Advertiser != l.adv || !cfg.Network.MDNS.Off || cfg.Network.InterfaceCheck >= 0 ||
+		cfg.Network.WiFi != nil || cfg.Network.BLE != nil || cfg.Network.TCP != (node.TCPConfig{}) || cfg.Client != nil ||
+		cfg.Observers.OnCommissioningComplete == nil {
 		return nil, errUnsafeConfig
 	}
 	d := l.site.AddNode(cfg)
@@ -411,7 +412,7 @@ func TestAA12CommissionReadSubscribe(t *testing.T) {
 	sub, err := fabrictest.Subscribe(ctx, pair, fabrictest.SubscribeRequest{
 		Attributes:         []fabrictest.AttributePath{currentPath},
 		MaxIntervalCeiling: &ceiling,
-		Updated: func(r *fabrictest.Report) {
+		Updated: func(r *fabrictest.Report) error {
 			repMu.Lock()
 			defer repMu.Unlock()
 			for _, a := range r.Attributes {
@@ -419,6 +420,7 @@ func TestAA12CommissionReadSubscribe(t *testing.T) {
 					reports = append(reports, activeCurrent(t, a))
 				}
 			}
+			return nil
 		},
 	})
 	if err != nil {

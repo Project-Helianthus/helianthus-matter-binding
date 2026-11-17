@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- The go-fabric module requirement is v0.22.2, and the Go directive is 1.27.4,
+  the version that release declares. The adapter no longer sets a reannounce
+  switch: the built-in responder stays off and the periodic interface
+  comparison stays off. Subscription report callbacks return the error the
+  release requires. Every breaking change from v0.16.0 through this release,
+  and how this repository absorbs it, is recorded in
+  `docs/adoption/pin-transition.md`. The fixture lock is unchanged.
+
 - Docs: every inventory row under `docs/target-profile/` is now keyed by its
   element in the docs-semantic element catalog and that element's plane
   membership; native owner and profile move to a provenance column. The
