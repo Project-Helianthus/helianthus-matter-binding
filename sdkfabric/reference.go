@@ -169,12 +169,15 @@ func (p *Port) New(plan adoption.NodePlan) (adoption.SDKNode, error) {
 }
 
 // nodeConfig states every transport and advertisement choice explicitly.
+// The built-in responder is off and the periodic interface comparison is
+// off. The release has no reannounce switch; an injected advertiser is the
+// only publication path.
 func (p *Port) nodeConfig(n *Node) node.Config {
 	return node.Config{
 		Network: node.Network{
-			Listen:     p.cfg.Listen,
-			Reannounce: node.Reannounce{Off: true},
-			MDNS:       node.MDNS{Off: true},
+			Listen:         p.cfg.Listen,
+			MDNS:           node.MDNS{Off: true},
+			InterfaceCheck: -1,
 		},
 		Commissioning:      p.cfg.Commissioning,
 		ProductDescription: p.cfg.ProductDescription,

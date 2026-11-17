@@ -6,15 +6,14 @@ The umbrella remains open. Nothing here is stable before Helianthus 1.0.
 
 ## Status and authority
 
-This is a proposal for an owner operation. **The pin is not installed.** The
-owner has adopted go-fabric on its Matter 1.6.1 data model. This document records
-no owner answer to the exact tag and module question, and it writes no lock,
-module, evaluator, gate or workflow file.
+The module requirement in `go.mod` is the current release, recorded in
+[Breaking changes absorbed by the installed module requirement](#breaking-changes-absorbed-by-the-installed-module-requirement).
+The sections after that record remain a proposal for the lock, evaluator and
+workflow change. They write no lock, evaluator, gate or workflow file.
 
-Approving or merging this dossier is not evidence that a pin was installed, that
-a checksum was verified, or that any B1–B8 or runtime qualification row passed.
-Every command below is a specification: none was run for this document. Every
-`<placeholder>` stays a placeholder until the owner supplies a verified value.
+Approving or merging the proposal sections is not evidence that a checksum was
+verified, or that any B1–B8 or runtime qualification row passed. The installed
+module requirement is not that evidence either.
 
 **Proven** below means only a bounded statement from the supplied graded go-fabric
 suitability report, or an observation of this repository's current source.
@@ -22,7 +21,63 @@ suitability report, or an observation of this repository's current source.
 are separate from the missing/failed/unverified/pass states of the
 [build ledger](../go-fabric-build-qualification.md).
 
+## Breaking changes absorbed by the installed module requirement
+
+**Proven:** `go.mod` requires `github.com/SukramJ/go-fabric` at `v0.22.2`, and
+its `go` directive is `1.27.4`, the version that release's module file
+declares. The previous requirement was `v0.16.0`. `go.sum` records the
+release. No file inside go-fabric is changed. The fixture lock, the evaluator
+and the workflow are unchanged.
+
+Each row is a breaking change the release notes mark between `v0.16.0` and
+`v0.22.2`, or a removal or comparability change those notes state in the same
+span. **Proven** on a resolution means this repository's source, not a claim
+about the release itself. **Unknown** is not used: every row was checked
+against the adapter and the qualification harnesses. Nothing in the list needs
+a change inside go-fabric.
+
+| Release | Breaking change | Resolution |
+| --- | --- | --- |
+| v0.17.0 | `controller/softwareupdate` `Images.DownloadUpdate` takes a force flag, and `Images.Delete` takes delete options and returns a count. | **Proven.** The binding does not call the image store. No change. |
+| v0.17.0 | `controller/client` `Registry.ForDevice` takes the local id a newly discovered node takes. An empty id allocates one. | **Proven.** The binding does not call `ForDevice`. No change. |
+| v0.17.0 | `SubscribeRequest.Updated` returns an error. A failed priming report fails the subscription; a later report is left unanswered. | **Proven.** Both fixture callbacks return nil after recording the report. A processing failure is not invented. |
+| v0.17.0 | `im.WriteTransaction` is no longer comparable with `==`. | **Proven.** The binding does not compare write transactions. No change. |
+| v0.17.0 | `store.Port` embeds `store.Eraser`. `Erase` clears every row and returns the next fabric index to 1. A host backend adds the method. | **Proven.** No host backend implements `store.Port`. The qualification store harness is an injected port of its own and does not gain an erase method. |
+| v0.17.0 | `WiFiNetworkCommissioning.OnCommissioningComplete` takes the commissioning request's context. | **Proven.** The binding does not implement that hook. The node observer still receives a fabric index. No change. |
+| v0.17.0 | The periodic reannounce configuration is removed (`node.Reannounce`, `node.Network.Reannounce`, `node.DefaultReannounceInterval`), and so are `mdns.NewZeroconf`, `mdns.Zeroconf`, `mdns.NewSubtypeResponder`, `mdns.SubtypeResponder` and `mdns.Reannouncer`. Fabric announce and withdraw, and the reannounce and subscription-terminated hooks, take a fabric index. | **Proven.** The node configuration drops the switch. Publication is the injected advertiser, and the built-in responder stays off. The static boundary still forbids the removed constructors and `node.Reannounce`. The binding does not call the fabric announce hooks. |
+| v0.17.0 | `node.SessionInfo` is no longer comparable with `==`. | **Proven.** The binding does not compare session info. No change. |
+| v0.18.0 | The attestation check `CdSignerVerificationSkipped` is removed. A Certification Declaration signature is always verified. An unknown signer fails with `CdSignerUnknown`. | **Proven.** This repository matches no attestation check. Trust configuration is unchanged. |
+| v0.18.0 | `CASEOptions.CaseAuthenticatedTags` and `ResumptionRecord.PeerCATs` are removed. A session's tags are the peer certificate's. | **Proven.** The binding sets neither. No change. |
+| v0.18.0 | TCP `MaxPayloadSize` counts the message without the length prefix, and `ErrReceiveBufferExceeded` is removed. | **Proven.** The fixture keeps TCP at the zero value, which is off, and sets no payload limit. |
+| v0.18.0 | `Descriptor.CaseAuthenticatedTags`, `CommissionOptions.CaseAuthenticatedTags` and `Record.CaseAuthenticatedTags` are removed. | **Proven.** The binding sets none of them. No change. |
+| v0.18.0 | `DatastoreSync` gains required `SyncEndpointBindings` and loses `SyncBinding`. | **Proven.** The binding does not implement that port. No change. |
+| v0.18.0 | `ColorControlServerConfig` is no longer comparable. | **Proven.** The binding does not compare it. No change. |
+| v0.18.0 | The controller's second node and its construction fields are removed. | **Proven.** The binding does not use them. No change. |
+| v0.19.0 | `topology.Build` takes the border-router entries as its second argument. | **Proven.** The binding does not call it. No change. |
+| v0.19.0 | Camera video and audio bounds are pointers. Nil means unstated. | **Proven.** The binding does not set them. No change. |
+| v0.19.0 | `endpoint.Store` gains `EraseEndpoints`. | **Proven.** The binding does not implement `endpoint.Store`. The qualification store harness is unchanged. |
+| v0.19.0 | `node.Network` and `node.MDNS` are no longer comparable. | **Proven.** The fixture compares the TCP value, the responder switch and the sign of the interface-check interval. It does not compare the whole values. |
+| v0.19.0 | The exchange receive notifier takes the message and a duplicate flag. | **Proven.** The binding sets no exchange notifier. No change. |
+| v0.19.0 | Basic Information boot restores are `RestoreNodeLabel` and `RestoreLocation`. `SetNodeLabel` is the run-time write. The persistent-write hook returns an error. | **Proven.** The binding calls none of those server methods. It still passes `node.BasicInformation` configuration. |
+| v0.19.1 | `InvokeOptions` is no longer comparable. | **Proven.** The binding does not compare invoke options. No change. |
+| v0.19.1 | Camera signal listeners also receive a refusal that carries only the session id, the fabric and the node. | **Proven.** The binding registers no camera listener. No change. |
+| v0.19.2 | A host that builds its own subscription manager must set the flush reporter, or a fabric-leaving flush sends nothing. | **Proven.** The binding does not build a subscription manager. The node wires its own. No change. |
+| v0.22.0 | `fabrictest.UseWiFiCommissioning` is removed. Wi-Fi commissioning is `node.Network.WiFi.Driver`. | **Proven.** The fixture does not call the helper. `Network.WiFi` stays nil, and the static fixture check forbids the helper. |
+
+The same releases add a periodic host-interface comparison whose zero interval
+means the default period. That is not marked as a breaking signature, and the
+fixture closes it: `Network.InterfaceCheck` is negative, which selects no
+periodic comparison. Bluetooth and the Wi-Fi driver stay unset. The diagnostic
+aliases in v0.21.0 change type identity with no source change; this repository
+does not name them.
+
+No later release through v0.22.2 marks a further breaking change.
+
 ## Question for the owner and proposed answer
+
+Every command in the proposal sections is a specification: none was run for
+those sections. Every `<placeholder>` stays a placeholder until the owner
+supplies a verified value.
 
 Which exact go-fabric tag and module identity replace the fork lock?
 
@@ -141,14 +196,15 @@ module closure instead of narrowing it by guesswork.
 
 ## Owner-only changes traced to current consumers
 
-Every path below is **external owner follow-through**. No batch ticket owns these
-files, including `sdk/matter-sdk.lock.json`, the future `go.mod` and `go.sum`,
+The module requirement in the section above is installed. Every path below is
+**external owner follow-through** for the separate lock change. No batch
+ticket owns these files, including `sdk/matter-sdk.lock.json`,
 `runtime/production_readiness.py` and `tools/validate_lock.py`.
 
 | Owner change | Current consumer | What the change must handle |
 | --- | --- | --- |
 | Replace `sdk/matter-sdk.lock.json` | `tools/validate_lock.py` reads it by default and compares it through `validate_lock`; `tests/test_production_readiness.py` loads it directly | Any edit without a matching evaluator edit denies and fails the validator. They must change together. |
-| Add `go.mod` and `go.sum` at the repository root | None today. The repository has neither file, its Go packages import only the standard library, and the gateway's `go.mod` names neither this repository nor go-fabric. Nine documents run `GO111MODULE=off` checks. | Choose this repository's module path; proposed `github.com/Project-Helianthus/helianthus-matter-binding`. Confirm that the `GO111MODULE=off` commands still work, which is a Hypothesis today. |
+| Keep `go.mod` and `go.sum` at the repository root | Both files exist. `go.mod` requires go-fabric `v0.22.2` with Go `1.27.4`. Tagged packages under `sdkfabric/` import that module. | The lock change must keep the module path `github.com/Project-Helianthus/helianthus-matter-binding` and must not retarget or remove the installed requirement. Whether a `GO111MODULE=off` command still applies stays a Hypothesis. |
 | Migrate `runtime/production_readiness.py` | Imported by `tools/validate_lock.py`, `runtime/adoption_baseline.py` and both test modules below. `EXPECTED_LOCK` and its pinned constants, `validate_build_evidence`, `REQUIRED_BUILD_TARGETS` and `validate_composition` all assume a commit-pinned C++ SDK. | Follow the evaluator rules below. |
 | Migrate `tools/validate_lock.py` | `.github/workflows/sdk-baseline.yml`, `scripts/checkout_sdk.sh`, `AGENTS.md`, `CONTRIBUTING.md`. `validate_checkout` and `--sdk-checkout` read commit and blob fields. `--mapping` reads `mapping.sha256`. | Replace checkout validation with module validation. Leave `validate_workflow_pins` and `tests/test_workflow_pins.py` as they are: that check is not SDK-specific. |
 | Reconcile `runtime/adoption_baseline.py` | `tests/test_adoption_baseline.py`; it calls the real evaluator | Its `checksum` field binds the zip `h1`. Its tag check accepts prereleases while the build contract requires a stable tag, so apply the stricter rule at selection. Decide whether to tighten the check in this change. |

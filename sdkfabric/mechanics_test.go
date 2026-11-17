@@ -413,7 +413,7 @@ func (r *aa30Run) subscribe(t *testing.T, pair *fabrictest.Pair, route *sdkfabri
 	sub, err := fabrictest.Subscribe(r.ctx, pair, fabrictest.SubscribeRequest{
 		Attributes:         []fabrictest.AttributePath{client.AttributeAt(ep, epmdef.ClusterID, epmdef.AttrActiveCurrent)},
 		MaxIntervalCeiling: &ceiling,
-		Updated: func(rep *fabrictest.Report) {
+		Updated: func(rep *fabrictest.Report) error {
 			for _, a := range rep.Attributes {
 				if a.Path.Attribute == epmdef.AttrActiveCurrent {
 					c := sdkfabric.ControllerReceipt{Null: a.Value.El.IsNull, Milliamperes: a.Value.El.Int, DataVersion: a.DataVersion}
@@ -423,6 +423,7 @@ func (r *aa30Run) subscribe(t *testing.T, pair *fabrictest.Pair, route *sdkfabri
 					route.Receive(c)
 				}
 			}
+			return nil
 		},
 	})
 	if err != nil {
