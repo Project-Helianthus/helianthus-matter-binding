@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Docs: `docs/reproducible-bridge-build.md` records the bridge binary as the
+  standalone gateway built without the nomatter profile. The targets are
+  linux/arm64 and linux/arm with GOARM=7, each built twice from a clean state
+  with trimpath, version-control stamping off and an empty build id. Each run
+  carries the Go toolchain, the module checksum of this module, the module
+  checksum of go-fabric, and an SBOM. This repository builds no second
+  executable. The official add-on build is not this job and stays without
+  Matter. A bench run cites the digest and is a separate session.
+
 - The SDK lock pins the go-fabric module path, release tag and module zip
   checksum recorded by the module files. The hosted workflow runs the Go
   adapter job only. `scripts/checkout_sdk.sh`, `scripts/run_upstream_fixture.sh`
