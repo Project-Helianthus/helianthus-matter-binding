@@ -1,9 +1,9 @@
 # Inventory completeness and evidence joins
 
 This is the proposed binding-local inventory acceptance contract for issue #15,
-a partial slice of parent #8 / Project #2. It defines how the six domain
-inventories must reconcile, independently of their future page contents. It is
-not a seventh inventory, a minimal target subset, a semantic mapping format, or
+a partial slice of parent #8 / Project #2. It defines how the inventory pages
+must reconcile, independently of their future page contents. It is
+not another inventory, a minimal target subset, a semantic mapping format, or
 an endpoint persistence design. Nothing here is stable before Helianthus 1.0.
 No inventory checkpoint is released by this document.
 
@@ -28,10 +28,10 @@ a Helianthus endpoint, interoperability, certification, or physical qualificatio
 The [semantic metadata registry](https://github.com/Project-Helianthus/helianthus-semreg/blob/main/semreg/v1/packs/metadata.go)
 composes Thermal, PV, storage, EVSE and infrastructure pack validators. That
 registration does not enumerate all driver groups or prove any capability's
-native evidence. In particular, six domain inventories do not imply six accepted
-packs or a separate accepted metering pack. For reconciliation, the domain
-partition is Thermal, PV, storage, EVSE, metering and infrastructure; membership
-and coverage still require the sweeps below.
+native evidence. In particular, the inventory pages do not imply accepted
+packs; metering is not a pack. A page groups rows for reading only. Rows are
+keyed by catalog element and plane membership as defined below; membership and
+coverage still require the sweeps below.
 
 The supplied sources do not include the complete adopted normative model
 contents or compatible accepted docs-semantic target evidence. These remain explicit completion
@@ -39,8 +39,8 @@ gaps. The [native CAN source sweep](can-driver-coverage.md) now records supplied
 Growatt V1.04, common shared-field and Gree raw/candidate source coverage, with
 qualification and target gaps kept separate. Lock metadata does not replace
 inspecting target contents. No exhaustive adopted feature list, full CAN
-capability list, or completed six-domain mapping is claimed here. No other
-domain inventory page is an input or prerequisite to these row rules and cases.
+capability list, or completed element mapping is claimed here. No other
+inventory page is an input or prerequisite to these row rules and cases.
 
 ## Full-family transition ledger
 
@@ -68,14 +68,15 @@ admission remain independent. No native sweep is repeated.
 | [Heating](heating.md): system, zone, circuit, DHW, direct boiler, module/cylinder/solar | Unknown Thermostat/sensor/water-heater/pump/valve/mixer/counter/configuration joins; electrical context changed only as above |
 | [PV](photovoltaic.md): SunSpec/Fronius, Growatt and Huawei | Changed Sensor/Topology; unchanged EPM revision; EEM revision 2 reported present, but sign/phase/energy/status/temperature and reset joins Unknown |
 | [EVSE](evse.md): charging family reads and retained limit outcomes | Changed Sensor/Topology; unchanged EPM revision and sole accepted evse.ac.current mapping; Energy EVSE revision 4 and EEM revision 2 presence leave all additional joins Unknown |
-| [Metering/infrastructure](metering.md): semantic fields, SunSpec meters, eeBUS raw values | Changed Sensor/Topology; unchanged EPM revision; EEM revision 2 presence, but sign/quantity/flow/phase/topology/status and counter closure Unknown |
+| [Electrical metering](metering.md): infrastructure-pack elements from semantic fields, SunSpec meters, eeBUS raw values | Changed Sensor/Topology; unchanged EPM revision; EEM revision 2 presence, but sign/quantity/flow/phase/topology/status and counter closure Unknown |
 | [Pumps](pumps.md): P1–P9 circuit, solar and boiler provenance | Unknown pump device/cluster/feature and command correspondence; no deletion or inferred off state |
 | [Thermostats](thermostats.md): R01–R26 and O01–O06 room/remote/control roles | Unknown prior identity → Thermostat revision 11 source presence; exact sensor, heating/cooling, mode/preset and operation closure Unknown |
 | [B524 matrix](b524-device-types.md): B01–B16 and RC01–RC08, T-S/T-H/T-U | Unknown sensor, thermostat, pump, valve/mixer, water and energy-management joins; DEM revision 4 does not establish activation/effect |
 | [CAN sweep](can-driver-coverage.md): four selected-profile, four common and seven Gree groups | Changed electrical context; EEM/DEM/Thermostat reported present, while battery/HVAC/fan/diagnostic and reverse joins stay Unknown |
 | Cross-family bridge composition | Unknown prior identities → Aggregator revision 2 / Bridged Node revision 3 source presence; Descriptor, parts/topology, identity continuity, reporting and mandatory closure Unknown |
 
-All six domains and every representable family remain in scope. The last row
+Every catalog element, every plane and every representable family remain in
+scope. The last row
 adds composition reconciliation, not a new native source or a replacement for
 any inventory. No first-bridge subset can release the full-inventory checkpoint.
 
@@ -85,15 +86,32 @@ These are review columns, not a new API, serialization schema, or mapping file.
 Use one row for each candidate source-fact to target-component join. A row's key
 is the ordered tuple:
 
-`(domain, native owner/profile, capability/fact, direction, target component)`
+`(catalog element, plane membership, direction, target component)`
+
+Earlier revisions of these pages keyed rows by native owner and profile and
+partitioned them into six review domains, one of which (metering) is not a
+pack; rows are now keyed by the element of the docs-semantic
+[element catalog](https://github.com/Project-Helianthus/helianthus-docs-semantic/blob/main/api/v1/element-catalog-v1.json)
+and its planes, and native owner and profile are provenance only.
 
 | Key field | Required interpretation |
 | --- | --- |
-| Domain | One of the six review domains above; a cross-domain reference does not change fact identity. |
-| Native owner/profile | Public native-contract owner plus exact profile/variant within that owner; a family label alone is insufficient. If unavailable, use an explicit unresolved source slot and track its replacement. |
-| Capability/fact | Owner-qualified fact identity and scope, such as service/measurement role, channel or phase where evidenced. Do not collapse distinct facts because their display names match. |
+| Catalog element | Element identifier from the element catalog, owned by a pack or by the core. A fact for which the catalog has no element is keyed **Absent from the catalog**; a source whose native fact is not established is keyed **No element selected: native fact Unknown**. Neither gap key matches another gap. Do not borrow a nearby element because names or units match. |
+| Plane membership | The element's planes exactly as the catalog records them (physical, energy, hydraulic, control, diagnostic, provenance). An element whose catalog disposition is unknown has **planes undecided**. Thermal measurement and setpoint rows keep their element without placing a thermal quantity on a resource; that placement is undecided. Planes are never inferred from the source, the page or the target. |
 | Direction | Native-to-Matter observation, Matter-to-native operation, or independently evidenced directions in separate rows. Read evidence never proves a write path. |
 | Target component | Candidate device type and revision, cluster and revision, feature selection and attribute/command/event role. An unresolved candidate is explicit, never an implicit Electrical Sensor default. |
+
+Native owner and profile are provenance, not key fields. Each row records the
+public native-contract owner plus exact profile/variant within that owner, and
+the owner-qualified fact identity and scope (service or measurement role,
+channel or phase where evidenced); a family label alone is insufficient. If the
+source is unavailable, record an explicit unresolved source slot and track its
+replacement. Two sources that populate one element stay two rows with one key
+each: equal keys never merge distinct source facts, scopes or evidence.
+Parent, child and power-topology relations between rows from different sources
+are not rebuilt from provenance; they come from the core relation types of the
+element catalog (`contains`, `groups`, `supplies`, `measures`, `controls`,
+`hosts`, `relays`).
 
 An unresolved slot permits a gap row, not a match between unknown facts. Resolve
 it through reviewed evidence and keep a trace from the old row to the new key.
@@ -103,11 +121,11 @@ fabric identity, credential, or persistence key.
 
 | Evidence columns | Required contents and separation |
 | --- | --- |
-| Source evidence | Public native contract location first; native owner/profile and driver group; inspected driver source location; supported fact, direction, units/scaling, scope and availability semantics; retained native evidence reference. Missing items remain explicit. |
+| Source evidence (provenance) | Public native contract location first; native owner/profile and driver group; inspected driver source location; supported fact, direction, units/scaling, scope and availability semantics; retained native evidence reference. Missing items remain explicit. |
 | Source confidence and qualification | Proven / Hypothesis / Unknown for each claim, with its supporting evidence and limits; native qualification recorded separately. A synthetic case is not native Proven evidence. |
 | Target evidence | Reviewed lock reference; inspected adopted data-model file and element; device/cluster revisions and feature conditions; mandatory closure ledger; public docs-semantic target mapping reference and its compatibility with the adopted baseline and future reviewed lock. |
 | Join decision | Representable, blocked pending evidence, or not representable under the adopted target, with rationale, unresolved facts and public owning follow-up. These are proposed review dispositions, not runtime return values. |
-| Reconciliation references | Canonical source-fact reference, cross-domain aliases, related joins, evidence conflicts, and the driver-group and target-sweep entries covered by this row. |
+| Reconciliation references | Canonical source-fact reference, aliases across elements and pages, related joins, evidence conflicts, and the driver-group and target-sweep entries covered by this row. |
 | Separate outcomes | Source qualification, inventory review disposition, composition-profile acceptance, matching build evidence and runtime admission each remain distinct. No one column upgrades another. |
 
 A source fact is not admitted into a mapping solely because a driver emits a
@@ -136,13 +154,14 @@ is blocked, not proof of impossibility. A not-representable decision needs a
 specific evidenced incompatibility; it is not a shortcut for an unavailable
 source view. Alternative target selection needs its own fully evidenced join.
 
-Use a canonical source-fact reference independent of domain to reconcile shared
-readings. Its identity retains native owner/profile, service or measurement
+Use a canonical source-fact reference independent of the element and page to
+reconcile shared readings. Its identity retains native owner/profile, service or measurement
 scope and fact identity; direction remains explicit in each join. Two readings
 with different scopes, phases or native owners are not duplicates merely because
-the units agree. Cross-domain aliases refer to one canonical fact and its closure
-ledger. Count distinct source facts once in source totals, and distinct target
-components once in target totals; count domain row coverage separately. If a
+the units agree. Aliases across elements refer to one canonical fact and its
+closure ledger. Count distinct source facts once in source totals, and distinct
+target components once in target totals; count per-element and per-plane row
+coverage separately. If a
 fact supports multiple target components, review each join's closure separately.
 This accounting neither allocates endpoints nor chooses endpoint sharing.
 Conflicting purported aliases stay unresolved until evidence reconciles them;
@@ -156,10 +175,10 @@ runtime result. Identifiers describe synthetic families and facts only.
 
 | Case and row key(s) | Source side | Target side and proposed disposition |
 | --- | --- | --- |
-| EVSE current: `(EVSE, synthetic-native/charging, ac.current, native-to-Matter observation, Electrical Sensor rev 1 / Electrical Power Measurement rev 3 / ActiveCurrent)` | Assume an evidenced current reading for a synthetic charging family solely for this example. The current baseline identifies `evse.ac.current`; the assumption supplies no other facts. | ActiveCurrent is optional. Missing evidenced Descriptor and Power Topology composition, non-unknown PowerMode, positive NumberOfMeasurementTypes, matching non-empty Accuracy and evidenced nullable ActivePower prevent closure. Record blocked pending evidence; never fill these from a sample or current magnitude. |
-| Shared electrical reading: `(PV, synthetic-native/electrical, service-a.active-power, native-to-Matter observation, candidate power attribute)` and `(metering, synthetic-native/electrical, service-a.active-power, native-to-Matter observation, candidate power attribute)` | Assume both rows cite the same public native fact and service scope. Make the metering row an alias to the canonical fact. If scopes differ, retain two facts instead. | Record two domain rows but one distinct source fact. One identical target candidate is counted once; mapping, locked feature conditions and mandatory closure remain Unknown, so both joins are blocked. No second physical measurement, accepted target or endpoint is inferred. |
-| Thermal modes: `(Thermal, synthetic-native/thermal, service-b.cooling, native-to-Matter observation, unresolved cooling component)` and `(Thermal, synthetic-native/thermal, service-b.heating, native-to-Matter observation, unresolved heating component)` | One synthetic Thermal service is assumed to evidence heating only. Its cooling capability is Unknown; shared service identity does not establish cooling support. | Keep separate rows and confidence claims. Heating still needs its own target mapping and closure; cooling is blocked for absent source evidence as well. Neither a shared service nor a target feature supplies cooling evidence. A future operation would require a separate direction row and native operation contract. |
-| Absent driver source: `(infrastructure, unresolved-native/synthetic-family, unresolved fact, native-to-Matter observation, unresolved target component)` | Register the driver group as awaiting inspection. Assume driver source and its public native fact contract are unavailable; no capability is invented. | Block the source sweep entry and join. This placeholder is not a counted representable fact, a negative representability proof, or a completed driver assessment. Reconcile its key and any actual domain membership only after the source is inspected. |
+| EVSE current: `(evse.ac.current, energy, native-to-Matter observation, Electrical Sensor rev 1 / Electrical Power Measurement rev 3 / ActiveCurrent)`; provenance synthetic-native/charging, ac.current | Assume an evidenced current reading for a synthetic charging family solely for this example. The current baseline identifies `evse.ac.current`; the assumption supplies no other facts. | ActiveCurrent is optional. Missing evidenced Descriptor and Power Topology composition, non-unknown PowerMode, positive NumberOfMeasurementTypes, matching non-empty Accuracy and evidenced nullable ActivePower prevent closure. Record blocked pending evidence; never fill these from a sample or current magnitude. |
+| Shared electrical reading: `(pv.ac.active_power, energy, native-to-Matter observation, candidate power attribute)` and `(infrastructure.ac.active_power, energy, native-to-Matter observation, candidate power attribute)`; provenance of both synthetic-native/electrical, service-a.active-power | Assume both rows cite the same public native fact and service scope. Make the second row an alias to the canonical fact. If scopes differ, retain two facts instead. | Record two element rows but one distinct source fact. Shared provenance establishes no relation between the two resources; any such relation comes from the core. One identical target candidate is counted once; mapping, locked feature conditions and mandatory closure remain Unknown, so both joins are blocked. No second physical measurement, accepted target or endpoint is inferred. |
+| Thermal modes: `(thermal.mode.zone, control, native-to-Matter observation, unresolved cooling component)` and `(thermal.mode.zone, control, native-to-Matter observation, unresolved heating component)`; provenance synthetic-native/thermal, service-b.cooling and service-b.heating | One synthetic Thermal service is assumed to evidence heating only. Its cooling capability is Unknown; shared service identity does not establish cooling support. | Keep separate rows and confidence claims. Heating still needs its own target mapping and closure; cooling is blocked for absent source evidence as well. Neither a shared service nor a target feature supplies cooling evidence. A future operation would require a separate direction row and native operation contract. |
+| Absent driver source: `(no element selected, no plane, native-to-Matter observation, unresolved target component)`; provenance unresolved-native/synthetic-family, unresolved fact | Register the driver group as awaiting inspection. Assume driver source and its public native fact contract are unavailable; no capability is invented. | Block the source sweep entry and join. This placeholder is not a counted representable fact, a negative representability proof, or a completed driver assessment. Reconcile its element and planes only after the source is inspected. |
 
 The EVSE mandatory list above is supported by the baseline and
 [readiness evaluator](https://github.com/Project-Helianthus/helianthus-matter-binding/blob/main/runtime/production_readiness.py).
@@ -179,29 +198,30 @@ coverage, evidence conflicts or required closure remains unresolved.
 
 1. **Source-to-target sweep:** enumerate the current driver groups from public
    driver/source views with their native contract and semantic owner. Account
-   for every current representable group and its facts across the six domains.
+   for every current representable group and its facts across every element and plane.
    Each group gets a disposition and row references, or an evidenced reason it
    has no representable facts. Include unavailable groups in an explicit gap
    register so that missing source views cannot disappear from the denominator.
    The five metadata registrations alone cannot establish this denominator.
 2. **Target-to-source sweep:** enumerate every relevant device type and cluster
    from the adopted Matter 1.6.1 normative model corpus, including mandatory dependencies and
-   relevant optional features. Define and review relevance across all six
-   domains; every excluded candidate needs a reason so a minimal Electrical
+   relevant optional features. Define and review relevance across every
+   catalog element and plane; every excluded candidate needs a reason so a minimal Electrical
    Sensor subset cannot masquerade as complete coverage. Give each relevant
    target a representability decision, joined rows and closure ledger, or an
    evidenced incompatibility. Missing inspection stays blocked.
 3. **Reconcile:** join the two ledgers through the row keys and canonical fact
    references. Resolve orphan groups, orphan target candidates, duplicate facts,
-   conflicting aliases and unclosed mandatory dependencies. Report per-domain
-   coverage and unique source/target totals separately, with explicit exclusions
-   and unresolved counts. Six populated or partial pages do not establish this.
+   conflicting aliases and unclosed mandatory dependencies. Report per-element
+   and per-plane coverage and unique source/target totals separately, with
+   explicit exclusions and unresolved counts. Populated or partial pages do not
+   establish this.
 
 Releasing the full-inventory checkpoint requires a reviewable evidence bundle:
 
 - A bounded, reviewed source-group roster and adopted target-tree roster, their
   inclusion/exclusion rationale, and complete two-way dispositions across all
-  six domains; no unresolved availability or coverage gaps.
+  catalog elements and planes; no unresolved availability or coverage gaps.
 - Public native documentation and inspected driver evidence, accepted semantic
   evidence and docs-semantic mappings for representable joins; each target's
   fully evidenced mandatory-feature closure and revision compatibility.
@@ -225,7 +245,7 @@ representable or admitted for production.
 The [B524 device-type matrix](b524-device-types.md) adds a bounded reverse
 reconciliation under #23 / parent #8. Its B01–B16 observation bundles and
 RC01–RC08 reverse bundles reuse the canonical [pump](pumps.md),
-[thermostat](thermostats.md) and domain facts. The reverse slice accounts for
+[thermostat](thermostats.md) and other page facts. The reverse slice accounts for
 five family searches: thermostat/room control, temperature/humidity sensors,
 pumps, valves/mixers and energy management. Acquisition references, operation
 candidates and supported operations are separately dispositioned; no supported

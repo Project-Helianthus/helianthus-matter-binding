@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Docs: every inventory row under `docs/target-profile/` is now keyed by its
+  element in the docs-semantic element catalog and that element's plane
+  membership; native owner and profile move to a provenance column. The
+  metering page is not a pack: its rows sit under the planes of their
+  `helianthus.pack.infrastructure` elements. Rows without a catalog element say
+  so, thermal measurement and setpoint rows keep their elements with planes
+  undecided and no resource placement, and cross-source relations come from
+  the core relation types. Row contents, device-type and cluster choices and
+  admission are unchanged.
+
 - CI: Ruff 0.15.10 now checks every Python file for naming (`N`), complexity
   (`C90`, at most 10) and statement-count (`PLR0915`, at most 50) findings
   against the committed `scripts/python-rules-baseline.json`, in the
