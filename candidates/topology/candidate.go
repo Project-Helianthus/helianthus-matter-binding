@@ -1,5 +1,7 @@
 // Package topology validates supplied graphs for an internal contribution
-// candidate. Its identifiers and association rules are not Matter definitions.
+// candidate. A node is keyed by its resource identifier. Native owner and
+// profile are provenance. An edge cites a relation key of one published
+// instance. These rules are not Matter definitions.
 package topology
 
 import (
@@ -9,37 +11,56 @@ import (
 	"unicode/utf8"
 )
 
-// Source is an explicit native owner, profile and service/measurement scope.
-// These opaque labels carry no qualification or protocol interpretation.
-type Source struct {
+// NativeTuple is the refused native owner, profile, scope and local id.
+// It is not a node key.
+type NativeTuple struct {
 	Owner   string
 	Profile string
 	Scope   string
+	ID      string
 }
 
-type Identity struct {
-	Source Source
-	ID     string
-}
-
-// Phase and Endpoint are opaque source-local association labels, not phase
-// enums, endpoint numbers or endpoint allocations. Empty means unknown.
+// Node is one resource. Owner and Profile are provenance and do not select
+// the node. Native, when set, is a native-tuple identity and is refused.
+// Phase and Endpoint are opaque association labels, not enumerations or
+// endpoint allocations. Empty means unknown.
 type Node struct {
-	Identity Identity
-	Phase    string
-	Endpoint string
+	ResourceID string
+	Owner      string
+	Profile    string
+	Phase      string
+	Endpoint   string
+	Native     *NativeTuple
 }
 
-// Edge is a supplied directed relation. Both ends must belong to one source.
+// RelationKey cites one published relation instance. Every field is part of
+// the key. From and To are resource identifiers.
+type RelationKey struct {
+	PackID      string
+	PackVersion string
+	Definition  string
+	Version     string
+	From        string
+	To          string
+}
+
+// Instance is one published relation. Coherence is the cut coherence of that
+// instance. Publisher is "core" when the core catalog published it.
+type Instance struct {
+	Key       RelationKey
+	Coherence string
+	Publisher string
+}
+
+// Edge cites one relation key. A nil citation is uncited.
 type Edge struct {
-	From Identity
-	To   Identity
+	Cited *RelationKey
 }
 
 type Graph struct {
-	Sources []Source
-	Nodes   []Node
-	Edges   []Edge
+	Nodes     []Node
+	Instances []Instance
+	Edges     []Edge
 }
 
 type Status string
@@ -51,12 +72,14 @@ const (
 )
 
 // Result exposes a detached, sorted graph only on structural success. Problems
-// are sorted, unique reason codes, not evidence of native or target support.
+// are sorted, unique reason codes.
 type Result struct {
 	Status    Status
 	Candidate *Graph
 	Problems  []string
 }
+
+type provenance struct{ owner, profile string }
 
 // Validate checks the entire supplied graph atomically. Rejection never edits
 // input or a caller's retained state. No discovery, mapping or admission occurs.
@@ -65,39 +88,30 @@ func Validate(g Graph) Result {
 	invalid, unknown := false, false
 	bad := func(code string) { invalid = true; problems[code] = true }
 	missing := func(code string) { unknown = true; problems[code] = true }
-	if len(g.Sources) == 0 {
-		missing("unknown_sources")
-	}
 	if len(g.Nodes) == 0 {
 		missing("unknown_nodes")
 	}
-	sources := map[Source]bool{}
-	for _, s := range g.Sources {
-		if !validSource(s) {
-			bad("invalid_source")
-		}
-		if sources[s] {
-			bad("duplicate_source")
-		}
-		sources[s] = true
-	}
-	type association struct {
-		Source Source
-		Label  string
-	}
-	phases, endpoints := map[association]string{}, map[association]string{}
-	nodes := map[Identity]bool{}
+	phases := map[association]string{}
+	endpoints := map[association]string{}
+	nodeByID := map[string]Node{}
 	for _, n := range g.Nodes {
-		if !validIdentity(n.Identity) {
+		if n.Native != nil {
+			bad("native_tuple_node")
+			continue
+		}
+		if !validLabel(n.ResourceID) {
 			bad("invalid_node_identity")
+			continue
 		}
-		if !sources[n.Identity.Source] {
-			bad("undeclared_source")
+		if !validLabel(n.Owner) || !validLabel(n.Profile) {
+			bad("invalid_provenance")
+			continue
 		}
-		if nodes[n.Identity] {
+		if _, ok := nodeByID[n.ResourceID]; ok {
 			bad("duplicate_node")
+			continue
 		}
-		nodes[n.Identity] = true
+		nodeByID[n.ResourceID] = n
 		if n.Phase == "" {
 			missing("unknown_phase")
 		} else if !validLabel(n.Phase) {
@@ -108,9 +122,9 @@ func Validate(g Graph) Result {
 		} else if !validLabel(n.Endpoint) {
 			bad("invalid_endpoint")
 		}
-		if n.Phase != "" && n.Endpoint != "" {
-			p := association{n.Identity.Source, n.Phase}
-			e := association{n.Identity.Source, n.Endpoint}
+		if n.Phase != "" && n.Endpoint != "" && validLabel(n.Phase) && validLabel(n.Endpoint) {
+			p := association{provenance{n.Owner, n.Profile}, n.Phase}
+			e := association{provenance{n.Owner, n.Profile}, n.Endpoint}
 			if prior, ok := phases[p]; ok && prior != n.Endpoint {
 				bad("phase_endpoint_conflict")
 			}
@@ -120,33 +134,55 @@ func Validate(g Graph) Result {
 			phases[p], endpoints[e] = n.Endpoint, n.Phase
 		}
 	}
-	seen := map[Edge]bool{}
-	adj := map[Identity][]Identity{}
-	degree := map[Identity]int{}
-	for id := range nodes {
+	byKey := map[RelationKey]Instance{}
+	for _, inst := range g.Instances {
+		if !validKey(inst.Key) || !validLabel(inst.Coherence) || !validLabel(inst.Publisher) {
+			bad("invalid_relation")
+			continue
+		}
+		if _, ok := byKey[inst.Key]; ok {
+			bad("duplicate_relation")
+		}
+		byKey[inst.Key] = inst
+	}
+	seen := map[RelationKey]bool{}
+	adj := map[string][]string{}
+	degree := map[string]int{}
+	for id := range nodeByID {
 		degree[id] = 0
 	}
 	for _, e := range g.Edges {
-		if !validIdentity(e.From) || !validIdentity(e.To) {
-			bad("invalid_edge_identity")
-		}
-		if !nodes[e.From] || !nodes[e.To] {
-			bad("dangling_reference")
+		if e.Cited == nil || !validKey(*e.Cited) {
+			bad("uncited_edge")
 			continue
 		}
-		if e.From.Source != e.To.Source {
-			bad("cross_source_edge")
-		}
-		if seen[e] {
+		key := *e.Cited
+		if seen[key] {
 			bad("duplicate_edge")
 			continue
 		}
-		seen[e] = true
-		adj[e.From] = append(adj[e.From], e.To)
-		degree[e.To]++
+		seen[key] = true
+		inst, ok := byKey[key]
+		if !ok {
+			bad("uncited_edge")
+			continue
+		}
+		from, fok := nodeByID[key.From]
+		to, tok := nodeByID[key.To]
+		if !fok || !tok {
+			bad("dangling_reference")
+			continue
+		}
+		if inst.Coherence != "coherent" {
+			bad("incoherent_relation")
+		}
+		if (from.Owner != to.Owner || from.Profile != to.Profile) && inst.Publisher != "core" {
+			bad("cross_source_edge")
+		}
+		adj[key.From] = append(adj[key.From], key.To)
+		degree[key.To]++
 	}
-	// Iterative cycle detection also covers disconnected components and self-loops.
-	queue := make([]Identity, 0, len(nodes))
+	queue := make([]string, 0, len(nodeByID))
 	for id, d := range degree {
 		if d == 0 {
 			queue = append(queue, id)
@@ -160,7 +196,7 @@ func Validate(g Graph) Result {
 			}
 		}
 	}
-	if len(queue) != len(nodes) {
+	if len(queue) != len(nodeByID) {
 		bad("cycle")
 	}
 	if invalid || unknown {
@@ -175,20 +211,32 @@ func Validate(g Graph) Result {
 		return r
 	}
 	out := Graph{
-		Sources: append([]Source(nil), g.Sources...),
-		Nodes:   append([]Node(nil), g.Nodes...),
-		Edges:   append([]Edge(nil), g.Edges...),
+		Nodes:     append([]Node(nil), g.Nodes...),
+		Instances: append([]Instance(nil), g.Instances...),
 	}
-	sort.Slice(out.Sources, func(i, j int) bool { return lessSource(out.Sources[i], out.Sources[j]) })
-	sort.Slice(out.Nodes, func(i, j int) bool { return lessIdentity(out.Nodes[i].Identity, out.Nodes[j].Identity) })
-	sort.Slice(out.Edges, func(i, j int) bool {
-		a, b := out.Edges[i], out.Edges[j]
-		if a.From != b.From {
-			return lessIdentity(a.From, b.From)
+	if g.Edges != nil {
+		out.Edges = make([]Edge, len(g.Edges))
+		for i, e := range g.Edges {
+			out.Edges[i] = cloneEdge(e)
 		}
-		return lessIdentity(a.To, b.To)
-	})
+		sort.Slice(out.Edges, func(i, j int) bool { return lessKey(*out.Edges[i].Cited, *out.Edges[j].Cited) })
+	}
+	sort.Slice(out.Nodes, func(i, j int) bool { return out.Nodes[i].ResourceID < out.Nodes[j].ResourceID })
+	sort.Slice(out.Instances, func(i, j int) bool { return lessKey(out.Instances[i].Key, out.Instances[j].Key) })
 	return Result{Status: Valid, Candidate: &out}
+}
+
+type association struct {
+	provenance provenance
+	label      string
+}
+
+func cloneEdge(e Edge) Edge {
+	if e.Cited != nil {
+		k := *e.Cited
+		e.Cited = &k
+	}
+	return e
 }
 
 func validLabel(s string) bool {
@@ -196,25 +244,18 @@ func validLabel(s string) bool {
 		!strings.ContainsFunc(s, unicode.IsControl)
 }
 
-func validSource(s Source) bool {
-	return validLabel(s.Owner) && validLabel(s.Profile) && validLabel(s.Scope)
+func validKey(k RelationKey) bool {
+	return validLabel(k.PackID) && validLabel(k.PackVersion) && validLabel(k.Definition) &&
+		validLabel(k.Version) && validLabel(k.From) && validLabel(k.To)
 }
 
-func validIdentity(id Identity) bool { return validSource(id.Source) && validLabel(id.ID) }
-
-func lessSource(a, b Source) bool {
-	if a.Owner != b.Owner {
-		return a.Owner < b.Owner
+func lessKey(a, b RelationKey) bool {
+	left := []string{a.PackID, a.PackVersion, a.Definition, a.Version, a.From, a.To}
+	right := []string{b.PackID, b.PackVersion, b.Definition, b.Version, b.From, b.To}
+	for i := range left {
+		if left[i] != right[i] {
+			return left[i] < right[i]
+		}
 	}
-	if a.Profile != b.Profile {
-		return a.Profile < b.Profile
-	}
-	return a.Scope < b.Scope
-}
-
-func lessIdentity(a, b Identity) bool {
-	if a.Source != b.Source {
-		return lessSource(a.Source, b.Source)
-	}
-	return a.ID < b.ID
+	return false
 }

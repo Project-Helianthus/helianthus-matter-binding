@@ -1,5 +1,7 @@
 // Package bridge implements an internal, offline contribution candidate.
 // It neither imports an SDK nor makes production admission decisions.
+// An association is keyed by its resource identifier. Native owner and profile
+// are provenance. A parent edge cites a relation key of one published instance.
 package bridge
 
 import (
@@ -7,16 +9,50 @@ import (
 	"strings"
 )
 
-// Association contains caller-owned opaque review identifiers. Slot is a
-// positive bookkeeping number, not a validated Matter endpoint number.
-// Capability must include the source fact's service/channel/phase scope.
-type Association struct {
-	Node, Owner, Profile, Capability, Composition, Binding string
-	Slot                                                   int64
-	Retired                                                bool
+// NativeTuple is the refused native owner, profile, scope and local id.
+// It is not an association key.
+type NativeTuple struct {
+	Owner   string
+	Profile string
+	Scope   string
+	ID      string
 }
 
-type Edge struct{ Node, Parent, Child string }
+// Association contains caller-owned opaque review identifiers. ResourceID is
+// the association key. Owner and Profile are provenance. Slot is a positive
+// bookkeeping number, not a validated Matter endpoint number.
+type Association struct {
+	Node, ResourceID, Owner, Profile, Capability, Composition, Binding string
+	Slot                                                               int64
+	Retired                                                            bool
+	Native                                                             *NativeTuple
+}
+
+// RelationKey cites one published relation instance. Every field is part of
+// the key. From and To are resource identifiers.
+type RelationKey struct {
+	PackID      string
+	PackVersion string
+	Definition  string
+	Version     string
+	From        string
+	To          string
+}
+
+// Instance is one published relation. Coherence is the cut coherence of that
+// instance. Publisher is "core" when the core catalog published it.
+type Instance struct {
+	Key       RelationKey
+	Coherence string
+	Publisher string
+}
+
+// Edge is a proposed parent and child binding. Cited is the relation key.
+// A nil citation is uncited.
+type Edge struct {
+	Node, Parent, Child string
+	Cited               *RelationKey
+}
 
 type Issue struct{ Code, Node, Binding string }
 
@@ -29,26 +65,59 @@ type Result struct {
 	Issues              []Issue
 }
 
-type sourceKey struct{ node, owner, profile, capability string }
+type resourceKey struct{ resourceID string }
 type bindingKey struct{ node, binding string }
 type slotKey struct {
 	node string
 	slot int64
 }
+type edgeKey struct{ node, parent, child string }
 
-func source(a Association) sourceKey   { return sourceKey{a.Node, a.Owner, a.Profile, a.Capability} }
+func source(a Association) resourceKey { return resourceKey{a.ResourceID} }
 func binding(a Association) bindingKey { return bindingKey{a.Node, a.Binding} }
 func token(s string) bool {
 	return s != "" && strings.TrimSpace(s) == s && !strings.ContainsAny(s, "\x00\r\n\t")
 }
 
+func validKey(k RelationKey) bool {
+	return token(k.PackID) && token(k.PackVersion) && token(k.Definition) &&
+		token(k.Version) && token(k.From) && token(k.To)
+}
+
+func cloneAssociation(a Association) Association {
+	if a.Native != nil {
+		n := *a.Native
+		a.Native = &n
+	}
+	return a
+}
+
+func cloneEdge(e Edge) Edge {
+	if e.Cited != nil {
+		k := *e.Cited
+		e.Cited = &k
+	}
+	return e
+}
+
+func cloneAssociations(records []Association) []Association {
+	if records == nil {
+		return nil
+	}
+	out := make([]Association, len(records))
+	for i, a := range records {
+		out[i] = cloneAssociation(a)
+	}
+	return out
+}
+
 // canonical orders even ambiguous records for deterministic diagnostics.
 func canonical(records []Association) []Association {
-	ordered := append([]Association(nil), records...)
+	ordered := cloneAssociations(records)
 	sort.Slice(ordered, func(i, j int) bool {
 		a, b := ordered[i], ordered[j]
-		left := []string{a.Node, a.Owner, a.Profile, a.Capability, a.Composition, a.Binding}
-		right := []string{b.Node, b.Owner, b.Profile, b.Capability, b.Composition, b.Binding}
+		left := []string{a.Node, a.ResourceID, a.Owner, a.Profile, a.Capability, a.Composition, a.Binding}
+		right := []string{b.Node, b.ResourceID, b.Owner, b.Profile, b.Capability, b.Composition, b.Binding}
 		for k := range left {
 			if left[k] != right[k] {
 				return left[k] < right[k]
@@ -62,18 +131,22 @@ func canonical(records []Association) []Association {
 	return ordered
 }
 
-// Review checks complete snapshots, never deltas. All old records must remain;
-// retirement is one-way and cannot release a slot within a node lifecycle.
-// A different node lifecycle must be reviewed separately, not substituted here.
-func Review(previous, proposed []Association, edges []Edge) Result {
-	r := Result{Retained: append([]Association(nil), previous...)}
+// Review checks complete snapshots, never deltas. The association key is the
+// resource identifier. All old resource keys must remain. Retirement is
+// one-way and cannot release a slot within a node lifecycle. Instances are the
+// published relations an edge may cite.
+func Review(previous, proposed []Association, edges []Edge, instances []Instance) Result {
+	r := Result{Retained: cloneAssociations(previous)}
 	add := func(code, node, id string) { r.Issues = append(r.Issues, Issue{code, node, id}) }
 	check := func(records []Association, prefix string) {
-		sources := map[sourceKey]bool{}
+		sources := map[resourceKey]bool{}
 		bindings := map[bindingKey]bool{}
 		slots := map[slotKey]bool{}
 		for _, a := range records {
-			if !token(a.Node) || !token(a.Owner) || !token(a.Profile) || !token(a.Capability) || !token(a.Binding) {
+			if a.Native != nil {
+				add(prefix+"native_tuple_node", a.Node, a.Binding)
+			}
+			if !token(a.Node) || !token(a.ResourceID) || !token(a.Owner) || !token(a.Profile) || !token(a.Capability) || !token(a.Binding) {
 				add(prefix+"identity_invalid", a.Node, a.Binding)
 			}
 			if !token(a.Composition) {
@@ -98,7 +171,7 @@ func Review(previous, proposed []Association, edges []Edge) Result {
 	ordered := canonical(proposed)
 	check(canonical(previous), "history_")
 	check(ordered, "")
-	bySource := map[sourceKey]Association{}
+	bySource := map[resourceKey]Association{}
 	byBinding := map[bindingKey]Association{}
 	for _, a := range ordered {
 		bySource[source(a)], byBinding[binding(a)] = a, a
@@ -109,18 +182,32 @@ func Review(previous, proposed []Association, edges []Edge) Result {
 			add("history_lost", old.Node, old.Binding)
 			continue
 		}
+		if old.Owner != next.Owner || old.Profile != next.Profile {
+			add("provenance_changed", old.Node, old.Binding)
+		}
 		if old.Composition != next.Composition {
 			add("composition_changed", old.Node, old.Binding)
 		}
-		if old.Binding != next.Binding || old.Slot != next.Slot {
+		if old.Node != next.Node || old.Capability != next.Capability || old.Binding != next.Binding || old.Slot != next.Slot {
 			add("association_changed", old.Node, old.Binding)
 		}
 		if old.Retired && !next.Retired {
 			add("retirement_reversed", old.Node, old.Binding)
 		}
 	}
+	byRelation := map[RelationKey]Instance{}
+	for _, inst := range instances {
+		if !validKey(inst.Key) || !token(inst.Coherence) || !token(inst.Publisher) {
+			add("invalid_relation", "", "")
+			continue
+		}
+		if _, ok := byRelation[inst.Key]; ok {
+			add("duplicate_relation", "", "")
+		}
+		byRelation[inst.Key] = inst
+	}
 	parents := map[bindingKey]bindingKey{}
-	seen := map[Edge]bool{}
+	seen := map[edgeKey]bool{}
 	for _, e := range edges {
 		p, c := bindingKey{e.Node, e.Parent}, bindingKey{e.Node, e.Child}
 		pa, pok := byBinding[p]
@@ -134,21 +221,31 @@ func Review(previous, proposed []Association, edges []Edge) Result {
 		if (pok && pa.Retired) || (cok && ca.Retired) {
 			add("edge_retired", e.Node, e.Child)
 		}
-		if seen[e] {
+		id := edgeKey{e.Node, e.Parent, e.Child}
+		if seen[id] {
 			add("edge_duplicate", e.Node, e.Child)
 		}
-		seen[e] = true
+		seen[id] = true
+		if e.Cited == nil || !validKey(*e.Cited) {
+			add("uncited_edge", e.Node, e.Child)
+		} else if inst, ok := byRelation[*e.Cited]; !ok {
+			add("uncited_edge", e.Node, e.Child)
+		} else if inst.Coherence != "coherent" {
+			add("incoherent_relation", e.Node, e.Child)
+		} else if !pok || !cok || inst.Key.From != pa.ResourceID || inst.Key.To != ca.ResourceID {
+			add("uncited_edge", e.Node, e.Child)
+		} else if (pa.Owner != ca.Owner || pa.Profile != ca.Profile) && inst.Publisher != "core" {
+			add("cross_source_edge", e.Node, e.Child)
+		}
 		if prior, ok := parents[c]; ok && prior != p {
 			add("multiple_parents", e.Node, e.Child)
 		}
 		parents[c] = p
 	}
-	// Topological elimination uses every distinct edge, including ambiguous
-	// parent proposals, so diagnostic selection cannot depend on input order.
 	degrees := map[bindingKey]int{}
 	children := map[bindingKey][]bindingKey{}
 	for e := range seen {
-		p, c := bindingKey{e.Node, e.Parent}, bindingKey{e.Node, e.Child}
+		p, c := bindingKey{e.node, e.parent}, bindingKey{e.node, e.child}
 		if _, ok := degrees[p]; !ok {
 			degrees[p] = 0
 		}
@@ -192,7 +289,7 @@ func Review(previous, proposed []Association, edges []Edge) Result {
 	if len(r.Issues) != 0 {
 		return r
 	}
-	r.Candidate = append([]Association(nil), proposed...)
+	r.Candidate = cloneAssociations(proposed)
 	sort.Slice(r.Candidate, func(i, j int) bool {
 		a, b := r.Candidate[i], r.Candidate[j]
 		if a.Node != b.Node {
@@ -200,7 +297,10 @@ func Review(previous, proposed []Association, edges []Edge) Result {
 		}
 		return a.Binding < b.Binding
 	})
-	r.Graph = append([]Edge(nil), edges...)
+	r.Graph = make([]Edge, len(edges))
+	for i, e := range edges {
+		r.Graph[i] = cloneEdge(e)
+	}
 	sort.Slice(r.Graph, func(i, j int) bool {
 		a, b := r.Graph[i], r.Graph[j]
 		if a.Node != b.Node {

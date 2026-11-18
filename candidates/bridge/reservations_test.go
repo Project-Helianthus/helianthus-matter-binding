@@ -7,7 +7,7 @@ import (
 )
 
 func aa11Association() Association {
-	return Association{Node: "node-a", Owner: "owner-a", Profile: "profile-a", Capability: "cap-a", Composition: "composition-a", Binding: "binding-a"}
+	return Association{Node: "node-a", ResourceID: "resource:meter:a", Owner: "owner-a", Profile: "profile-a", Capability: "cap-a", Composition: "composition-a", Binding: "binding-a"}
 }
 func aa11Policy(t *testing.T, limit int64, retained []Association) *Reservations {
 	t.Helper()
@@ -33,6 +33,7 @@ func TestAA11DeselectionRetainsAndRetirementIsOneWay(t *testing.T) {
 		t.Fatal("first number")
 	}
 	b := aa11Association()
+	b.ResourceID = "resource:meter:b"
 	b.Capability = "cap-b"
 	b.Binding = "binding-b"
 	b = aa11Reserve(t, p, b)
@@ -64,6 +65,7 @@ func TestAA11DeselectionRetainsAndRetirementIsOneWay(t *testing.T) {
 		t.Fatal("retirement reversed")
 	}
 	c := aa11Association()
+	c.ResourceID = "resource:meter:c"
 	c.Capability = "cap-c"
 	c.Binding = "binding-c"
 	c = aa11Reserve(t, p, c)
@@ -87,6 +89,7 @@ func TestAA11ExhaustionBeforeEffectsAndNoWrap(t *testing.T) {
 		a.Retired = true
 		p := aa11Policy(t, limit, []Association{a})
 		b := aa11Association()
+		b.ResourceID = "resource:meter:b"
 		b.Capability = "cap-b"
 		b.Binding = "binding-b"
 		effects := 0
@@ -103,7 +106,7 @@ func TestAA11ExhaustionBeforeEffectsAndNoWrap(t *testing.T) {
 		if got.Slot != limit {
 			t.Fatal("final number withheld")
 		}
-		if _, err := q.Reserve(Association{Node: "node-a", Owner: "owner-a", Profile: "profile-a", Capability: "cap-c", Composition: "composition-a", Binding: "binding-c"}); err == nil {
+		if _, err := q.Reserve(Association{Node: "node-a", ResourceID: "resource:meter:c", Owner: "owner-a", Profile: "profile-a", Capability: "cap-c", Composition: "composition-a", Binding: "binding-c"}); err == nil {
 			t.Fatal("allocator wrapped")
 		}
 	}
@@ -115,6 +118,7 @@ func TestAA11ExhaustionBeforeEffectsAndNoWrap(t *testing.T) {
 func TestAA11ReservationIdentityFields(t *testing.T) {
 	variants := map[string]func(*Association){
 		"node":        func(a *Association) { a.Node = "node-b" },
+		"resource":    func(a *Association) { a.ResourceID = "resource:meter:z" },
 		"owner":       func(a *Association) { a.Owner = "owner-b" },
 		"profile":     func(a *Association) { a.Profile = "profile-b" },
 		"capability":  func(a *Association) { a.Capability = "cap-b" },
@@ -128,6 +132,7 @@ func TestAA11ReservationIdentityFields(t *testing.T) {
 			a := aa11Association()
 			a.Slot = 1
 			b := a
+			b.ResourceID = "resource:meter:sibling"
 			b.Capability = "cap-sibling"
 			b.Binding = "binding-sibling"
 			b.Slot = 2
@@ -147,46 +152,69 @@ func TestAA11ReservationIdentityFields(t *testing.T) {
 	}
 }
 
-// Source-key axes must also remain distinct when every binding/slot is unique.
-// These positives catch a source key that drops owner, profile or capability.
-func TestAA11DistinctSourceAxes(t *testing.T) {
-	variants := map[string]func(*Association){"owner": func(a *Association) { a.Owner = "owner-b" }, "profile": func(a *Association) { a.Profile = "profile-b" }, "capability": func(a *Association) { a.Capability = "cap-b" }}
-	for name, change := range variants {
-		t.Run(name, func(t *testing.T) {
-			p := aa11Policy(t, 2, nil)
-			a := aa11Reserve(t, p, aa11Association())
-			b := aa11Association()
-			change(&b)
-			b.Binding = "binding-b"
-			got := aa11Reserve(t, p, b)
-			b.Slot = 2
-			if got != b || !reflect.DeepEqual(p.Retained(), []Association{a, b}) {
-				t.Fatal("source key conflated")
+// ResourceID is the reservation key. A second resource allocates the next slot
+// even when owner, profile and capability match. Dropping ResourceID from the
+// key refuses that reserve. Including owner, profile or capability allocates a
+// second slot for a changed provenance or capability.
+func TestAA11ResourceKey(t *testing.T) {
+	p := aa11Policy(t, 2, nil)
+	a := aa11Reserve(t, p, aa11Association())
+	b := aa11Association()
+	b.ResourceID = "resource:meter:b"
+	b.Binding = "binding-b"
+	got := aa11Reserve(t, p, b)
+	b.Slot = 2
+	if got != b || !reflect.DeepEqual(p.Retained(), []Association{a, b}) {
+		t.Fatal("resource key conflated")
+	}
+	for _, tc := range []struct {
+		name string
+		edit func(*Association)
+	}{
+		{"owner", func(a *Association) { a.Owner = "owner-b" }},
+		{"profile", func(a *Association) { a.Profile = "profile-b" }},
+		{"capability", func(a *Association) { a.Capability = "cap-b" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			q := aa11Policy(t, 2, []Association{a})
+			bad := a
+			tc.edit(&bad)
+			bad.Binding = "binding-b"
+			bad.Slot = 0
+			if _, err := q.Reserve(bad); err == nil {
+				t.Fatal("provenance or capability allocated another slot")
+			}
+			if !reflect.DeepEqual(q.Retained(), []Association{a}) {
+				t.Fatal("failed reserve changed the resource")
 			}
 		})
 	}
-	// Node lifecycle is a separate ledger; identical identities there may start at one.
-	a := aa11Association()
-	a.Node = "node-b"
-	p, err := NewReservations("node-b", 2, nil)
+	other := aa11Association()
+	other.Node = "node-b"
+	other.ResourceID = "resource:meter:b"
+	q, err := NewReservations("node-b", 2, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := aa11Reserve(t, p, a); got.Slot != 1 {
-		t.Fatal("node scope conflated")
+	if got := aa11Reserve(t, q, other); got.Slot != 1 {
+		t.Fatal("node ledger conflated")
 	}
 }
 
 func TestAA11RetainedSnapshotValidation(t *testing.T) {
 	a := aa11Association()
 	a.Slot = 1
-	for _, variant := range []string{"node", "owner", "profile", "capability", "composition", "binding", "slot", "duplicate", "conflict", "out-of-range"} {
+	for _, variant := range []string{"node", "resource", "owner", "profile", "capability", "composition", "binding", "slot", "duplicate", "conflict", "out-of-range", "native"} {
 		t.Run(variant, func(t *testing.T) {
 			bad := a
 			records := []Association{bad}
 			switch variant {
 			case "node":
 				bad.Node = ""
+			case "resource":
+				bad.ResourceID = ""
+			case "native":
+				bad.Native = &NativeTuple{Owner: "owner-a", Profile: "profile-a", Scope: "service-a", ID: "local-a"}
 			case "owner":
 				bad.Owner = ""
 			case "profile":
@@ -205,6 +233,7 @@ func TestAA11RetainedSnapshotValidation(t *testing.T) {
 				records = append(records, a)
 			case "conflict":
 				b := a
+				b.ResourceID = "resource:meter:b"
 				b.Capability = "cap-b"
 				b.Binding = "binding-b"
 				records = append(records, b)
@@ -238,6 +267,7 @@ func TestAA11ReviewFailurePreservesSiblings(t *testing.T) {
 	a := aa11Association()
 	a.Slot = 1
 	b := a
+	b.ResourceID = "resource:meter:sibling"
 	b.Capability = "cap-sibling"
 	b.Binding = "binding-sibling"
 	b.Slot = 2
@@ -246,6 +276,7 @@ func TestAA11ReviewFailurePreservesSiblings(t *testing.T) {
 	// reach Review rather than fail the next-number check. A failed review must
 	// not replace the prior snapshot with the rejected proposal.
 	proposal := aa11Association()
+	proposal.ResourceID = "resource:meter:new"
 	proposal.Capability = "cap-new"
 	proposal.Binding = b.Binding
 	if _, err := p.Reserve(proposal); err == nil {
