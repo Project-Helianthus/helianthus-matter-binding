@@ -20,7 +20,7 @@ func NewReservations(node string, limit int64, retained []Association) (*Reserva
 			return nil, fmt.Errorf("retained association outside node or slot limit")
 		}
 	}
-	r := Review(nil, retained, nil)
+	r := Review(nil, retained, nil, nil)
 	if len(r.Issues) != 0 {
 		return nil, fmt.Errorf("invalid retained associations: %v", r.Issues)
 	}
@@ -58,7 +58,7 @@ func (p *Reservations) Reserve(a Association) (Association, error) {
 	}
 	a.Slot = next
 	proposed := append(p.Retained(), a)
-	r := Review(p.history, proposed, nil)
+	r := Review(p.history, proposed, nil, nil)
 	if len(r.Issues) != 0 {
 		return Association{}, fmt.Errorf("association review failed: %v", r.Issues)
 	}
@@ -90,7 +90,7 @@ func (p *Reservations) Retire(binding string) error {
 	if !found {
 		return fmt.Errorf("unknown binding")
 	}
-	r := Review(p.history, proposed, nil)
+	r := Review(p.history, proposed, nil, nil)
 	if len(r.Issues) != 0 {
 		return fmt.Errorf("retirement review failed: %v", r.Issues)
 	}

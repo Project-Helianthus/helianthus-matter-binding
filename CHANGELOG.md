@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Topology and bridge candidates key each node by its resource identifier.
+  An edge is admitted only when it cites the relation key of a coherent
+  instance, and a cross-source edge published by the core is admitted.
+  Native owner and profile stay on the record as provenance. A native-tuple
+  node, an uncited edge and an incoherent relation are refused. Reservations
+  follow the resource key.
+
 - Docs: `docs/reproducible-bridge-build.md` records the bridge binary as the
   standalone gateway built without the nomatter profile. The targets are
   linux/arm64 and linux/arm with GOARM=7, each built twice from a clean state
