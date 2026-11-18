@@ -1,17 +1,19 @@
-"""Persistent Portal endpoint selection behind the fail-closed readiness gate.
+"""Endpoint publication behind the publication rule and the fail-closed readiness gate.
 
-Selection intent and the endpoint ledger live in an injected store. This module
-creates no Matter node, endpoint, fabric, or commissioning state. A Matter
-target report offers each selected capability on one canonical resource. The
-ledger keys one endpoint number to each resource's ResourceID and records the
-composition digest it was admitted under. Parent and child endpoints are
-derived on every reconciliation from the relation instances the report cites
-and are never persisted. Nothing is read through the Portal catalog.
+The endpoint ledger lives in an injected store. This module creates no Matter
+node, endpoint, fabric, or commissioning state. A Matter target report offers
+catalog elements on canonical resources. The publication rule decides first:
+only an element with a transformed roster row that the exclusion list does not
+name can make its resource eligible. The ledger keys one endpoint number to
+each resource's ResourceID and records the composition digest it was admitted
+under. Parent and child endpoints are derived on every reconciliation from the
+relation instances the report cites and are never persisted. Nothing is read
+through the Portal catalog.
 
 An eligible result only means that the unchanged readiness evaluator permitted
 allocation and that the endpoint number was durably recorded first. The
-reviewed lock pins no accepted profile, so today every selected capability is
-withheld and nothing is allocated.
+reviewed lock pins no accepted profile, so today every resource is withheld and
+nothing is allocated.
 """
 
 from __future__ import annotations
@@ -23,14 +25,13 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol
 
 from runtime.production_readiness import Decision, _composition_digest, evaluate
+from runtime.publication_rule import PublicationRule, allocation_refusal
 
 
-SELECTION_KEY = "portal-selection"
 LEDGER_KEY = "endpoint-ledger"
 SCHEMA_VERSION = 1
 FIRST_ENDPOINT = 1
 LAST_ENDPOINT = 0xFFFE
-SELECTION_FIELDS = frozenset({"schema_version", "selected"})
 LEDGER_FIELDS = frozenset({"schema_version", "node_id", "records"})
 RECORD_FIELDS = frozenset({"resource_id", "composition_sha256", "endpoint"})
 # Forest core types: each resource is the part of at most one instance.
@@ -48,10 +49,6 @@ _NO_PARENT = "presented under no parent"
 
 class StoreError(Exception):
     """Raised by a store that cannot durably read or write a document."""
-
-
-class SelectionStateError(Exception):
-    """Persisted selection intent is unreadable and must not be overwritten."""
 
 
 class EndpointStore(Protocol):
@@ -85,13 +82,13 @@ class RelationInstance:
 
 @dataclass(frozen=True)
 class Offer:
-    """A target-report disposition offering one capability on one resource.
+    """A target-report disposition offering one catalog element on one resource.
 
     The anchor is the resource's identity evidence as published. It is never a
     ledger key: an anchor supersession keeps the ResourceID and so the endpoint.
     """
 
-    capability: str
+    element: str
     resource_id: str
     anchor: str
     relations: tuple[RelationKey, ...] = ()
@@ -107,18 +104,20 @@ class TargetReport:
 
 
 @dataclass(frozen=True)
-class CapabilityState:
-    capability: str
+class ElementState:
+    """The outcome for one offered element on one resource."""
+
+    element: str
+    resource_id: str
     state: str
     reasons: tuple[str, ...]
-    resource_id: str | None = None
     endpoint: int | None = None
     parent_endpoint: int | None = None
 
 
 @dataclass(frozen=True)
 class Reconciliation:
-    states: tuple[CapabilityState, ...]
+    states: tuple[ElementState, ...]
     faults: tuple[str, ...]
 
 
@@ -169,20 +168,6 @@ def _read(store: EndpointStore, key: str) -> tuple[Any, str | None]:
         return _decode(data), None
     except (ValueError, UnicodeDecodeError, RecursionError):
         return None, f"{key} is corrupt"
-
-
-def _parse_selection(store: EndpointStore) -> tuple[frozenset[str], str | None]:
-    document, fault = _read(store, SELECTION_KEY)
-    if fault:
-        return frozenset(), fault
-    if document is None:
-        return frozenset(), None
-    if not isinstance(document, dict) or set(document) != SELECTION_FIELDS or document["schema_version"] != SCHEMA_VERSION:
-        return frozenset(), f"{SELECTION_KEY} has an unsupported shape"
-    selected = document["selected"]
-    if not isinstance(selected, list) or not all(_is_text(item) for item in selected) or len(set(selected)) != len(selected):
-        return frozenset(), f"{SELECTION_KEY} has malformed or duplicate capabilities"
-    return frozenset(selected), None
 
 
 def _valid_record(record: Any) -> bool:
@@ -255,7 +240,7 @@ def _report_is_malformed(report: Any) -> bool:
         or not _is_text(report.lens)
         or not isinstance(report.offers, tuple)
         or not isinstance(report.relations, tuple)
-        or not all(isinstance(offer, Offer) and _is_text(offer.capability) for offer in report.offers)
+        or not all(isinstance(offer, Offer) and _is_text(offer.element) and isinstance(offer.resource_id, str) for offer in report.offers)
     )
 
 
@@ -267,26 +252,29 @@ def _offer_fault(offer: Offer) -> str | None:
     return None
 
 
-def _resolve_offers(report: Any, capabilities: list[str]) -> tuple[dict[str, Offer], dict[str, CapabilityState]]:
-    """Map each selected capability to the one well-formed offer that cites its resource."""
-    if _report_is_malformed(report):
-        reason = ("Matter target report is absent or malformed",)
-        return {}, {c: CapabilityState(c, WITHHELD, reason) for c in capabilities}
-    counts = Counter(offer.capability for offer in report.offers)
-    offers: dict[str, Offer] = {}
-    withheld: dict[str, CapabilityState] = {}
+_OfferKey = tuple[str, str]
+
+
+def _resolve_offers(report: TargetReport, rule: PublicationRule) -> tuple[dict[_OfferKey, Offer], dict[_OfferKey, ElementState]]:
+    """Ask the publication rule about every offer, then keep the well-formed, unambiguous ones."""
+    counts = Counter((offer.element, offer.resource_id) for offer in report.offers)
+    offers: dict[_OfferKey, Offer] = {}
+    withheld: dict[_OfferKey, ElementState] = {}
     for offer in report.offers:
-        if offer.capability not in capabilities:
-            continue
-        fault = "Matter target report has more than one offer for this capability" if counts[offer.capability] > 1 else _offer_fault(offer)
+        key = (offer.element, offer.resource_id)
+        fault = rule.withhold_reason(offer.element, offer.resource_id)
+        if fault is None and counts[key] > 1:
+            fault = "Matter target report has more than one offer for this element on this resource"
+        fault = fault or _offer_fault(offer)
         if fault:
-            withheld[offer.capability] = CapabilityState(offer.capability, WITHHELD, (fault,))
+            withheld[key] = ElementState(offer.element, offer.resource_id, WITHHELD, (fault,))
         else:
-            offers[offer.capability] = offer
-    for capability in capabilities:
-        if capability not in offers and capability not in withheld:
-            withheld[capability] = CapabilityState(capability, WITHHELD, ("Matter target report has no offer for this capability",))
+            offers[key] = offer
     return offers, withheld
+
+
+def _ordered(states: dict[_OfferKey, ElementState]) -> tuple[ElementState, ...]:
+    return tuple(states[key] for key in sorted(states))
 
 
 def _published(relations: tuple[Any, ...]) -> dict[RelationKey, RelationInstance]:
@@ -323,7 +311,7 @@ def _cited_parent(resource_id: str, cited: set[RelationKey], published: dict[Rel
     return parent, None
 
 
-def _compose(report: TargetReport, offers: dict[str, Offer], endpoints: dict[str, int]) -> dict[str, tuple[int | None, tuple[str, ...]]]:
+def _compose(report: TargetReport, offers: dict[_OfferKey, Offer], endpoints: dict[str, int]) -> dict[str, tuple[int | None, tuple[str, ...]]]:
     """Derive each eligible resource's parent endpoint from the cited relations."""
     published = _published(report.relations)
     cited = {key for offer in offers.values() for key in offer.relations}
@@ -349,62 +337,45 @@ def _compose(report: TargetReport, offers: dict[str, Offer], endpoints: dict[str
 
 
 class EndpointSelector:
-    """Persist Portal selection intent and the resource endpoint ledger for one node lifecycle."""
+    """Apply the publication rule and keep the resource endpoint ledger for one node lifecycle."""
 
     def __init__(
         self,
         store: EndpointStore,
         node_id: str,
         *,
+        rule: PublicationRule,
         readiness: Callable[[Any, Any, Any], Decision] = evaluate,
     ) -> None:
         if not _is_text(node_id):
             raise ValueError("node identity must be non-empty text")
+        if not isinstance(rule, PublicationRule):
+            raise ValueError("a publication rule is required")
         self._store = store
         self._node_id = node_id
+        self._rule = rule
         self._readiness = readiness
 
-    def selected(self) -> frozenset[str]:
-        selected, fault = _parse_selection(self._store)
-        if fault:
-            raise SelectionStateError(fault)
-        return selected
-
-    def select(self, capability: str) -> None:
-        self._update_selection(capability, add=True)
-
-    def deselect(self, capability: str) -> None:
-        self._update_selection(capability, add=False)
-
-    def _update_selection(self, capability: str, *, add: bool) -> None:
-        if not _is_text(capability):
-            raise ValueError("capability must be non-empty text")
-        selected = self.selected()
-        if (capability in selected) == add:
-            return
-        updated = selected | {capability} if add else selected - {capability}
-        self._store.write(SELECTION_KEY, _encode({"schema_version": SCHEMA_VERSION, "selected": sorted(updated)}))
-
     def reconcile(self, lock: Any, composition: Any, build_evidence: Any, report: Any) -> Reconciliation:
-        """Withhold, restore, or durably allocate an endpoint for every selected capability's resource."""
-        selected, fault = _parse_selection(self._store)
-        if fault:
-            return Reconciliation((), (fault,))
-        if not selected:
-            return Reconciliation((), ())
-        capabilities = sorted(selected)
+        """Withhold, restore, or durably allocate an endpoint for every resource the rule publishes."""
+        if _report_is_malformed(report):
+            return Reconciliation((), ("Matter target report is absent or malformed",))
+        offers, states = _resolve_offers(report, self._rule)
+        if not offers:
+            return Reconciliation(_ordered(states), ())
 
         decision = self._readiness(lock, composition, build_evidence)
         if not isinstance(decision, Decision) or decision.permitted is not True:
             reasons = decision.reasons if isinstance(decision, Decision) and decision.reasons else ("readiness evaluator did not permit allocation",)
-            return Reconciliation(tuple(CapabilityState(c, WITHHELD, tuple(reasons)) for c in capabilities), ())
+            states.update((key, ElementState(*key, WITHHELD, tuple(reasons))) for key in offers)
+            return Reconciliation(_ordered(states), ())
 
         ledger, fault = _parse_ledger(self._store, self._node_id)
         if ledger is None:
             assert fault is not None
-            return Reconciliation(tuple(CapabilityState(c, WITHHELD, (fault,)) for c in capabilities), (fault,))
+            states.update((key, ElementState(*key, WITHHELD, (fault,))) for key in offers)
+            return Reconciliation(_ordered(states), (fault,))
         faults = (ledger.allocation_fault,) if ledger.allocation_fault else ()
-        offers, states = _resolve_offers(report, capabilities)
         digest = _composition_digest(composition)
 
         endpoints: dict[str, int] = {}
@@ -421,8 +392,8 @@ class EndpointSelector:
                 endpoints[resource_id] = record["endpoint"]
             elif ledger.allocation_fault:
                 withheld[resource_id] = (ledger.allocation_fault,)
-            elif next_endpoint > LAST_ENDPOINT:
-                withheld[resource_id] = ("endpoint number space is exhausted for this node lifecycle",)
+            elif refusal := allocation_refusal(len(ledger.records) + len(pending), next_endpoint, LAST_ENDPOINT):
+                withheld[resource_id] = (refusal,)
             else:
                 pending.append({"resource_id": resource_id, "composition_sha256": digest, "endpoint": next_endpoint})
                 next_endpoint += 1
@@ -438,11 +409,11 @@ class EndpointSelector:
                 endpoints.update((record["resource_id"], record["endpoint"]) for record in pending)
 
         composed = _compose(report, offers, endpoints) if endpoints else {}
-        for capability, offer in offers.items():
+        for key, offer in offers.items():
             resource_id = offer.resource_id
             if resource_id in endpoints:
                 parent_endpoint, notes = composed[resource_id]
-                states[capability] = CapabilityState(capability, ELIGIBLE, notes, resource_id, endpoints[resource_id], parent_endpoint)
+                states[key] = ElementState(*key, ELIGIBLE, notes, endpoints[resource_id], parent_endpoint)
             else:
-                states[capability] = CapabilityState(capability, WITHHELD, withheld[resource_id])
-        return Reconciliation(tuple(states[c] for c in capabilities), faults)
+                states[key] = ElementState(*key, WITHHELD, withheld[resource_id])
+        return Reconciliation(_ordered(states), faults)

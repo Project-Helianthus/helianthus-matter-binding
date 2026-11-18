@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Breaking: one publication rule replaces per-capability Portal selection. A
+  live resource is published only when its catalog element has a
+  `transformed` row on the derived Matter roster and is not named in
+  `publication/exclusions.json`, whose committed list is empty; every other
+  disposition, an unmapped element, an empty resource id and a relation are
+  withheld with a named reason and get no number. Transformed elements of one
+  resource share one endpoint. The new `publication` Go package embeds the
+  list and keeps a store that gives each resource id the lowest free number,
+  saves the complete document before the number is returned, never moves or
+  frees a number and refuses a new id beyond 64 stored ids. The Python
+  selector asks `runtime/publication_rule.py` before a resource can become
+  eligible, and selection intent and its store key are removed. Readiness
+  stays deny-all and no roster row is added.
+
 - Breaking: the endpoint ledger keys each Matter endpoint number to a canonical
   resource. A record is exactly the `ResourceID`, the composition digest and
   the endpoint number; the random local identity and the per-capability record
