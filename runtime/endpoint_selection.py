@@ -1,18 +1,23 @@
 """Persistent Portal endpoint selection behind the fail-closed readiness gate.
 
-Selection intent and the endpoint identity ledger live in an injected store.
-This module creates no Matter node, endpoint, fabric, or commissioning state.
+Selection intent and the endpoint ledger live in an injected store. This module
+creates no Matter node, endpoint, fabric, or commissioning state. A Matter
+target report offers each selected capability on one canonical resource. The
+ledger keys one endpoint number to each resource's ResourceID and records the
+composition digest it was admitted under. Parent and child endpoints are
+derived on every reconciliation from the relation instances the report cites
+and are never persisted. Nothing is read through the Portal catalog.
+
 An eligible result only means that the unchanged readiness evaluator permitted
-allocation and that a locally generated opaque identity and endpoint number
-were durably recorded first. The reviewed lock pins no accepted profile, so
-today every selected capability is withheld and nothing is allocated.
+allocation and that the endpoint number was durably recorded first. The
+reviewed lock pins no accepted profile, so today every selected capability is
+withheld and nothing is allocated.
 """
 
 from __future__ import annotations
 
 import json
 import re
-import secrets
 from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Callable, Protocol
@@ -27,14 +32,18 @@ FIRST_ENDPOINT = 1
 LAST_ENDPOINT = 0xFFFE
 SELECTION_FIELDS = frozenset({"schema_version", "selected"})
 LEDGER_FIELDS = frozenset({"schema_version", "node_id", "records"})
-RECORD_FIELDS = frozenset({"identity", "capability", "composition_sha256", "endpoint"})
+RECORD_FIELDS = frozenset({"resource_id", "composition_sha256", "endpoint"})
+# Forest core types: each resource is the part of at most one instance.
+PARENT_CORE_TYPES = frozenset({"contains", "hosts"})
+COHERENT = "coherent"
 
 WITHHELD = "withheld"
 ELIGIBLE = "eligible"
 
-_IDENTITY = re.compile(r"[A-Za-z0-9_-]{16,128}")
+_RESOURCE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:/@-]{0,255}")
 _DIGEST = re.compile(r"[0-9a-f]{64}")
 _MAX_TEXT = 256
+_NO_PARENT = "presented under no parent"
 
 
 class StoreError(Exception):
@@ -54,12 +63,57 @@ class EndpointStore(Protocol):
 
 
 @dataclass(frozen=True)
+class RelationKey:
+    """One published relation instance; every member is part of the key."""
+
+    pack_id: str
+    pack_version: str
+    definition: str
+    version: str
+    from_resource: str
+    to_resource: str
+
+
+@dataclass(frozen=True)
+class RelationInstance:
+    """A relation instance in the report's cut, with its core type and coherence."""
+
+    key: RelationKey
+    core_type: str
+    coherence: str
+
+
+@dataclass(frozen=True)
+class Offer:
+    """A target-report disposition offering one capability on one resource.
+
+    The anchor is the resource's identity evidence as published. It is never a
+    ledger key: an anchor supersession keeps the ResourceID and so the endpoint.
+    """
+
+    capability: str
+    resource_id: str
+    anchor: str
+    relations: tuple[RelationKey, ...] = ()
+
+
+@dataclass(frozen=True)
+class TargetReport:
+    """The Matter target report over a named lens."""
+
+    lens: str
+    offers: tuple[Offer, ...]
+    relations: tuple[RelationInstance, ...] = ()
+
+
+@dataclass(frozen=True)
 class CapabilityState:
     capability: str
     state: str
     reasons: tuple[str, ...]
-    identity: str | None = None
+    resource_id: str | None = None
     endpoint: int | None = None
+    parent_endpoint: int | None = None
 
 
 @dataclass(frozen=True)
@@ -73,13 +127,16 @@ class _Ledger:
     records: list[dict[str, Any]] = field(default_factory=list)
     valid: dict[str, dict[str, Any]] = field(default_factory=dict)
     withheld: dict[str, set[str]] = field(default_factory=dict)
-    identities: set[str] = field(default_factory=set)
     highest_endpoint: int = FIRST_ENDPOINT - 1
     allocation_fault: str | None = None
 
 
 def _is_text(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip()) and value == value.strip() and len(value) <= _MAX_TEXT
+
+
+def _is_resource(value: Any) -> bool:
+    return isinstance(value, str) and _RESOURCE_ID.fullmatch(value) is not None
 
 
 def _encode(document: dict[str, Any]) -> bytes:
@@ -131,11 +188,9 @@ def _parse_selection(store: EndpointStore) -> tuple[frozenset[str], str | None]:
 def _valid_record(record: Any) -> bool:
     if not isinstance(record, dict) or set(record) != RECORD_FIELDS:
         return False
-    identity, endpoint = record["identity"], record["endpoint"]
+    endpoint = record["endpoint"]
     return (
-        isinstance(identity, str)
-        and _IDENTITY.fullmatch(identity) is not None
-        and _is_text(record["capability"])
+        _is_resource(record["resource_id"])
         and isinstance(record["composition_sha256"], str)
         and _DIGEST.fullmatch(record["composition_sha256"]) is not None
         and isinstance(endpoint, int)
@@ -164,37 +219,137 @@ def _parse_ledger(store: EndpointStore, node_id: str) -> tuple[_Ledger | None, s
             well_formed.append(record)
             continue
         ledger.allocation_fault = "endpoint ledger has a malformed record; new allocation is withheld"
-        if isinstance(record, dict) and _is_text(record.get("capability")):
-            ledger.withheld.setdefault(record["capability"], set()).add("persisted endpoint record is malformed")
+        if isinstance(record, dict) and _is_resource(record.get("resource_id")):
+            ledger.withheld.setdefault(record["resource_id"], set()).add("persisted endpoint record is malformed")
 
-    capabilities = Counter(record["capability"] for record in well_formed)
-    identities = Counter(record["identity"] for record in well_formed)
+    resources = Counter(record["resource_id"] for record in well_formed)
     endpoints = Counter(record["endpoint"] for record in well_formed)
     for record in well_formed:
-        capability = record["capability"]
-        reasons = ledger.withheld.get(capability, set())
-        if capabilities[capability] > 1:
-            reasons.add("capability has duplicate persisted endpoint records")
-        if identities[record["identity"]] > 1:
-            reasons.add("persisted identity is shared with another record")
+        resource_id = record["resource_id"]
+        reasons = ledger.withheld.get(resource_id, set())
+        if resources[resource_id] > 1:
+            reasons.add("resource has duplicate persisted endpoint records")
         if endpoints[record["endpoint"]] > 1:
             reasons.add("persisted endpoint number is shared with another record")
         if reasons:
-            ledger.withheld[capability] = reasons
-        ledger.identities.add(record["identity"])
+            ledger.withheld[resource_id] = reasons
         ledger.highest_endpoint = max(ledger.highest_endpoint, record["endpoint"])
     for record in well_formed:
-        if record["capability"] not in ledger.withheld:
-            ledger.valid[record["capability"]] = record
+        if record["resource_id"] not in ledger.withheld:
+            ledger.valid[record["resource_id"]] = record
     return ledger, None
 
 
-def _new_identity() -> str:
-    return secrets.token_hex(16)
+def _valid_key(key: Any) -> bool:
+    return (
+        isinstance(key, RelationKey)
+        and all(_is_text(value) for value in (key.pack_id, key.pack_version, key.definition, key.version))
+        and _is_resource(key.from_resource)
+        and _is_resource(key.to_resource)
+    )
+
+
+def _report_is_malformed(report: Any) -> bool:
+    return (
+        not isinstance(report, TargetReport)
+        or not _is_text(report.lens)
+        or not isinstance(report.offers, tuple)
+        or not isinstance(report.relations, tuple)
+        or not all(isinstance(offer, Offer) and _is_text(offer.capability) for offer in report.offers)
+    )
+
+
+def _offer_fault(offer: Offer) -> str | None:
+    if not _is_resource(offer.resource_id) or not _is_text(offer.anchor):
+        return "offer cites no well-formed resource"
+    if not isinstance(offer.relations, tuple) or not all(_valid_key(key) for key in offer.relations):
+        return "offer cites a malformed relation key"
+    return None
+
+
+def _resolve_offers(report: Any, capabilities: list[str]) -> tuple[dict[str, Offer], dict[str, CapabilityState]]:
+    """Map each selected capability to the one well-formed offer that cites its resource."""
+    if _report_is_malformed(report):
+        reason = ("Matter target report is absent or malformed",)
+        return {}, {c: CapabilityState(c, WITHHELD, reason) for c in capabilities}
+    counts = Counter(offer.capability for offer in report.offers)
+    offers: dict[str, Offer] = {}
+    withheld: dict[str, CapabilityState] = {}
+    for offer in report.offers:
+        if offer.capability not in capabilities:
+            continue
+        fault = "Matter target report has more than one offer for this capability" if counts[offer.capability] > 1 else _offer_fault(offer)
+        if fault:
+            withheld[offer.capability] = CapabilityState(offer.capability, WITHHELD, (fault,))
+        else:
+            offers[offer.capability] = offer
+    for capability in capabilities:
+        if capability not in offers and capability not in withheld:
+            withheld[capability] = CapabilityState(capability, WITHHELD, ("Matter target report has no offer for this capability",))
+    return offers, withheld
+
+
+def _published(relations: tuple[Any, ...]) -> dict[RelationKey, RelationInstance]:
+    """Index well-formed coherent instances; a key published twice is unusable."""
+    counts = Counter(item.key for item in relations if isinstance(item, RelationInstance) and _valid_key(item.key))
+    return {
+        item.key: item
+        for item in relations
+        if isinstance(item, RelationInstance)
+        and _valid_key(item.key)
+        and counts[item.key] == 1
+        and item.coherence == COHERENT
+        and _is_text(item.core_type)
+    }
+
+
+def _cited_parent(resource_id: str, cited: set[RelationKey], published: dict[RelationKey, RelationInstance], endpoints: dict[str, int]) -> tuple[str | None, str | None]:
+    parents: set[str] = set()
+    for key in cited:
+        if key.to_resource != resource_id:
+            continue
+        instance = published.get(key)
+        if instance is None:
+            return None, f"a cited relation is not a coherent published instance; {_NO_PARENT}"
+        if instance.core_type in PARENT_CORE_TYPES:
+            parents.add(key.from_resource)
+    if len(parents) > 1:
+        return None, f"cited relations name more than one parent; {_NO_PARENT}"
+    if not parents:
+        return None, None
+    parent = parents.pop()
+    if parent not in endpoints:
+        return None, f"parent resource has no eligible endpoint; {_NO_PARENT}"
+    return parent, None
+
+
+def _compose(report: TargetReport, offers: dict[str, Offer], endpoints: dict[str, int]) -> dict[str, tuple[int | None, tuple[str, ...]]]:
+    """Derive each eligible resource's parent endpoint from the cited relations."""
+    published = _published(report.relations)
+    cited = {key for offer in offers.values() for key in offer.relations}
+    parent_of: dict[str, str] = {}
+    notes: dict[str, tuple[str, ...]] = {}
+    for resource_id in endpoints:
+        parent, reason = _cited_parent(resource_id, cited, published, endpoints)
+        if parent is not None:
+            parent_of[resource_id] = parent
+        notes[resource_id] = (reason,) if reason else ()
+    for resource_id in list(parent_of):
+        seen, current = {resource_id}, parent_of[resource_id]
+        while current in parent_of and current not in seen:
+            seen.add(current)
+            current = parent_of[current]
+        if current == resource_id:
+            notes[resource_id] = (f"cited parent relations form a cycle; {_NO_PARENT}",)
+    composed = {r: (None, notes[r]) for r in endpoints}
+    for resource_id, parent in parent_of.items():
+        if not notes[resource_id]:
+            composed[resource_id] = (endpoints[parent], ())
+    return composed
 
 
 class EndpointSelector:
-    """Persist Portal selection intent and admitted endpoint identity for one node lifecycle."""
+    """Persist Portal selection intent and the resource endpoint ledger for one node lifecycle."""
 
     def __init__(
         self,
@@ -202,14 +357,12 @@ class EndpointSelector:
         node_id: str,
         *,
         readiness: Callable[[Any, Any, Any], Decision] = evaluate,
-        new_identity: Callable[[], str] = _new_identity,
     ) -> None:
         if not _is_text(node_id):
             raise ValueError("node identity must be non-empty text")
         self._store = store
         self._node_id = node_id
         self._readiness = readiness
-        self._new_identity = new_identity
 
     def selected(self) -> frozenset[str]:
         selected, fault = _parse_selection(self._store)
@@ -232,8 +385,8 @@ class EndpointSelector:
         updated = selected | {capability} if add else selected - {capability}
         self._store.write(SELECTION_KEY, _encode({"schema_version": SCHEMA_VERSION, "selected": sorted(updated)}))
 
-    def reconcile(self, lock: Any, composition: Any, build_evidence: Any) -> Reconciliation:
-        """Withhold, restore, or durably allocate identity for every selected capability."""
+    def reconcile(self, lock: Any, composition: Any, build_evidence: Any, report: Any) -> Reconciliation:
+        """Withhold, restore, or durably allocate an endpoint for every selected capability's resource."""
         selected, fault = _parse_selection(self._store)
         if fault:
             return Reconciliation((), (fault,))
@@ -251,46 +404,45 @@ class EndpointSelector:
             assert fault is not None
             return Reconciliation(tuple(CapabilityState(c, WITHHELD, (fault,)) for c in capabilities), (fault,))
         faults = (ledger.allocation_fault,) if ledger.allocation_fault else ()
+        offers, states = _resolve_offers(report, capabilities)
         digest = _composition_digest(composition)
 
-        states: dict[str, CapabilityState] = {}
+        endpoints: dict[str, int] = {}
+        withheld: dict[str, tuple[str, ...]] = {}
         pending: list[dict[str, Any]] = []
         next_endpoint = ledger.highest_endpoint + 1
-        for capability in capabilities:
-            if capability in ledger.withheld:
-                states[capability] = CapabilityState(capability, WITHHELD, tuple(sorted(ledger.withheld[capability])))
-                continue
-            record = ledger.valid.get(capability)
-            if record is not None:
-                if record["composition_sha256"] != digest:
-                    states[capability] = CapabilityState(capability, WITHHELD, ("persisted identity belongs to a different composition; a reviewed migration is required",))
-                else:
-                    states[capability] = CapabilityState(capability, ELIGIBLE, (), record["identity"], record["endpoint"])
-                continue
-            if ledger.allocation_fault:
-                states[capability] = CapabilityState(capability, WITHHELD, (ledger.allocation_fault,))
-                continue
-            if next_endpoint > LAST_ENDPOINT:
-                states[capability] = CapabilityState(capability, WITHHELD, ("endpoint number space is exhausted for this node lifecycle",))
-                continue
-            identity = self._new_identity()
-            if not isinstance(identity, str) or _IDENTITY.fullmatch(identity) is None or identity in ledger.identities:
-                states[capability] = CapabilityState(capability, WITHHELD, ("generated identity is malformed or already recorded",))
-                continue
-            ledger.identities.add(identity)
-            pending.append({"identity": identity, "capability": capability, "composition_sha256": digest, "endpoint": next_endpoint})
-            next_endpoint += 1
+        for resource_id in sorted({offer.resource_id for offer in offers.values()}):
+            record = ledger.valid.get(resource_id)
+            if resource_id in ledger.withheld:
+                withheld[resource_id] = tuple(sorted(ledger.withheld[resource_id]))
+            elif record is not None and record["composition_sha256"] != digest:
+                withheld[resource_id] = ("persisted endpoint belongs to a different composition; a reviewed migration is required",)
+            elif record is not None:
+                endpoints[resource_id] = record["endpoint"]
+            elif ledger.allocation_fault:
+                withheld[resource_id] = (ledger.allocation_fault,)
+            elif next_endpoint > LAST_ENDPOINT:
+                withheld[resource_id] = ("endpoint number space is exhausted for this node lifecycle",)
+            else:
+                pending.append({"resource_id": resource_id, "composition_sha256": digest, "endpoint": next_endpoint})
+                next_endpoint += 1
 
         if pending:
             document = {"schema_version": SCHEMA_VERSION, "node_id": self._node_id, "records": ledger.records + pending}
             try:
                 self._store.write(LEDGER_KEY, _encode(document))
             except (StoreError, OSError):
-                reason = ("endpoint ledger could not be persisted",)
-                for record in pending:
-                    states[record["capability"]] = CapabilityState(record["capability"], WITHHELD, reason)
+                withheld.update((record["resource_id"], ("endpoint ledger could not be persisted",)) for record in pending)
                 faults += (f"{LEDGER_KEY} could not be written",)
             else:
-                for record in pending:
-                    states[record["capability"]] = CapabilityState(record["capability"], ELIGIBLE, (), record["identity"], record["endpoint"])
+                endpoints.update((record["resource_id"], record["endpoint"]) for record in pending)
+
+        composed = _compose(report, offers, endpoints) if endpoints else {}
+        for capability, offer in offers.items():
+            resource_id = offer.resource_id
+            if resource_id in endpoints:
+                parent_endpoint, notes = composed[resource_id]
+                states[capability] = CapabilityState(capability, ELIGIBLE, notes, resource_id, endpoints[resource_id], parent_endpoint)
+            else:
+                states[capability] = CapabilityState(capability, WITHHELD, withheld[resource_id])
         return Reconciliation(tuple(states[c] for c in capabilities), faults)

@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Breaking: the endpoint ledger keys each Matter endpoint number to a canonical
+  resource. A record is exactly the `ResourceID`, the composition digest and
+  the endpoint number; the random local identity and the per-capability record
+  are removed, and a record of the earlier shape is malformed. Reconciliation
+  takes the Matter target report over a named lens: each selected capability
+  needs exactly one offer citing its resource, and capabilities on one
+  resource share its endpoint. The number follows the `ResourceID`, so it
+  survives restarts and anchor supersession, and a replaced unit gets the next
+  number while the old one is never reused. Parent endpoints are derived on
+  every pass from cited, coherent `contains` or `hosts` instances and are
+  never persisted. The Portal catalog is never read, so withdrawing a Portal
+  contribution changes nothing. Readiness stays deny-all.
+
 - Topology and bridge candidates key each node by its resource identifier.
   An edge is admitted only when it cites the relation key of a coherent
   instance, and a cross-source edge published by the core is admitted.

@@ -1,8 +1,8 @@
 # Portal selection and endpoint lifecycle
 
 This is the binding-local design contract for issue #6, a partial slice of
-parent #4 / Project #2 INT-13. It specifies future Portal selection, persistent
-opaque endpoint identity, and fabric lifecycle responsibilities. It does not
+parent #4 / Project #2 INT-13. It specifies future Portal selection, endpoint
+numbers keyed to canonical resources, and fabric lifecycle responsibilities. It does not
 implement a Portal, persistence store, launcher, or production endpoint, and
 does not complete the parent acceptance criteria.
 
@@ -23,8 +23,8 @@ composition-profile digest. Selected capabilities must therefore be shown as
 **withheld**, with the evaluator's denial reason. There is no commissioning or
 endpoint allocation path in this revision.
 
-“Stable endpoint identity” here means persistent identity across restarts within
-the same binding node lifecycle. It is not an API stability promise. The design
+“Stable endpoint number” here means a number that follows its resource across
+restarts within the same binding node lifecycle. It is not an API stability promise. The design
 and interfaces remain pre-stable before 1.0; no MCP namespace or GraphQL contract
 changes are introduced here.
 
@@ -82,33 +82,73 @@ references; it does not independently prove the truth of supplied native facts.
 Evidence labels Proven / Hypothesis / Unknown remain separate from native
 qualification and target admission. Selection does not upgrade either axis.
 
-## Persistent opaque identity design
+## Resource-keyed endpoint ledger
 
-A future admitted runtime must persist a locally generated opaque binding
-identity associated with the semantic capability, target composition, binding
-node identity, and assigned Matter endpoint number. Portal labels, discovery
-order, transient values, and device-family display names are not identity keys.
-Public examples use synthetic families and must contain no real identifiers.
+The [endpoint selector](../runtime/endpoint_selection.py) keys every Matter
+endpoint number to a canonical resource. The identity and relation rules are
+those of the graph contract in helianthus-docs-semantic (`api/v1/graph.md`,
+sections 6, 7, 32 and 33); this repository does not decide them.
 
-Within the same node lifecycle, restart and deselect/reselect must recover the
-same identity and endpoint number for the same compatible composition. Retained
-inactive identity records are bookkeeping, not allocated endpoints. Unselected
-or withheld capabilities without a prior admitted endpoint receive no endpoint
-number or placeholder allocation. Retired numbers must not be assigned to a
-different capability within that node lifecycle.
+Offers come from the Matter target report over a named lens. Each offer is one
+disposition that offers a selected capability on exactly one resource, cites
+that resource's `ResourceID` and anchor key, and cites the relation keys it was
+made from. A capability without exactly one well-formed offer is withheld. A
+report that is absent or malformed withholds every selected capability.
 
-Persist the identity-to-endpoint association durably before exposing an endpoint;
-restore and validate it before reporting or commissioning. Missing, corrupt,
-ambiguous, or conflicting persisted state must withhold affected publication
-without guessing a new identity. Preserve valid unaffected records and native
-last-known-good state. A composition or node-identity change requires an explicit
-reviewed migration or retirement decision; it cannot silently reuse an old
-identity for a different target. Atomic storage, recovery, and migration tests
-remain future runtime work.
+One endpoint maps to one resource (CID-1): capabilities offered on the same
+resource share its endpoint. A ledger record is exactly
+`{resource_id, composition_sha256, endpoint}` for the binding node lifecycle
+named by the ledger. The anchor, the capability, Portal labels, discovery order,
+transient values, and device-family display names are not ledger keys. Public
+examples use synthetic families and must contain no real identifiers.
+
+The endpoint number follows the `ResourceID` (CID-3):
+
+| Event | `ResourceID` | Endpoint number |
+| --- | --- | --- |
+| Restart, deselect and reselect | same | same record, same number |
+| Anchor supersession | same | same record, same number |
+| Equipment replaced by another unit | new | new record and next number; the old record stays |
+| Function kept across an equipment replacement | same | same record, same number |
+| Composition profile changed | same | withheld; the record stays pending a reviewed migration |
+
+Within the same node lifecycle, numbers are allocated above the highest number
+ever recorded and are never reassigned, so the number of a replaced unit is
+never reused. Retained inactive records are bookkeeping, not allocated
+endpoints. Unselected or withheld capabilities without a prior admitted
+endpoint receive no number or placeholder allocation.
+
+Parent and child endpoints follow the cited relations (TGT-2). On every
+reconciliation an eligible resource is placed under the endpoint of the `from`
+resource of a relation instance that an offer cites with this resource as `to`,
+when that instance is published in the report exactly once under the same
+`(pack, pack version, definition, version, from, to)` key, is `coherent`, and
+has the forest core type `contains` or `hosts`. The endpoint is presented under
+no parent, with a stated reason, when a cited relation to it is not such an
+instance, when cited relations name more than one parent, when the parent has
+no eligible endpoint, or when the parents form a cycle. `groups`, `measures`,
+`supplies`, `controls` and `relays` instances make no parent. Parentage is
+never persisted (CID-5): a changed relation moves the endpoint without
+rewriting the ledger.
+
+The selector never reads the Portal catalog (PTL-5). Withdrawing a Portal
+contribution leaves the ledger and every reconciliation result unchanged. An
+offer that leaves the target report withholds its capability and keeps the
+record, so the same number returns with the offer.
+
+Persist a new record durably before exposing its endpoint; restore and
+validate it before reporting or commissioning. A failed write exposes neither
+the endpoint nor a parent placement under it. Missing, corrupt, ambiguous, or
+conflicting persisted state withholds the affected resources without guessing
+a number: a resource with two records, two resources with one number, or a
+malformed record, which also withholds every new allocation. Preserve valid
+unaffected records and native last-known-good state. A composition or
+node-identity change requires an explicit reviewed migration or retirement
+decision outside this module; the ledger accepts only the record shape above.
 
 ## Fabric lifecycle design
 
-Endpoint identity is scoped to a binding node and does not encode credentials,
+The endpoint ledger is scoped to a binding node and does not encode credentials,
 fabric identifiers, network coordinates, or controller identity. Fabric storage
 belongs to the node's SDK lifecycle and is separate from Portal selection and
 semantic caches. No selection, withholding, synthetic fixture, or accepted build
@@ -127,10 +167,10 @@ new fabric material. A restart may restore genuine existing fabric state only
 through future validated SDK integration; it must not infer commissioning from a
 selection flag or cached value. Removing a fabric follows the SDK node lifecycle
 and must not manufacture a replacement or automatically rejoin. Removing the last
-fabric need not erase the local endpoint identity ledger; any later commissioning
+fabric need not erase the local endpoint ledger; any later commissioning
 still requires admission and action-time confirmation. An explicitly confirmed
 node reset retires the old node lifecycle and clears its owned fabric state and
-identity ledger; continuity after reset must not be claimed. These are design
+endpoint ledger; continuity after reset must not be claimed. These are design
 requirements, not implemented or exercised reset/commissioning operations.
 
 ## Offline lifecycle scenarios
@@ -141,14 +181,20 @@ requirements, not implemented or exercised reset/commissioning operations.
 | Select a capability with today's reviewed lock. | Withheld with the absent-profile reason; no allocation or commissioning. |
 | Supply accepted-looking metadata and passing build JSON today. | Still withheld; immutable reviewed baseline controls admission. |
 | Restart with selection intent but no previously admitted endpoint. | Restore intent and recompute withholding; no placeholder endpoint. |
-| Future admitted endpoint restarts with valid persistence. | Re-evaluate evidence and restore the same identity and endpoint number before exposure. |
-| Future admitted endpoint is deselected, then selected again. | Remove active publication; retain inactive identity; reuse only after renewed admission with compatible composition. |
+| Future admitted endpoint restarts with valid persistence. | Re-evaluate evidence and restore the same resource record and endpoint number before exposure. |
+| Future admitted endpoint is deselected, then selected again. | Remove active publication; retain the inactive record; reuse only after renewed admission with compatible composition. |
+| The resource's anchor is superseded. | Same `ResourceID`, same record and endpoint number. |
+| The equipment is replaced by another unit. | New `ResourceID`, new record and next endpoint number; the old number is never reused. |
+| The cited relations change. | The endpoint moves to its new parent or to no parent; the ledger is not rewritten. |
+| A Portal contribution is withdrawn. | Ledger and reconciliation results unchanged. |
 | Evidence becomes invalid while other endpoints remain valid. | Withhold the affected publication; preserve valid records, native evidence, and partial last-known-good state. |
-| Persistence is corrupt or target composition changes. | Withhold affected publication pending recovery or reviewed migration; no guessed identity. |
+| Persistence is corrupt or target composition changes. | Withhold affected publication pending recovery or reviewed migration; no guessed number. |
 | One endpoint is withheld on a node with legitimate fabrics. | No new fabric state and no deletion of shared legitimate material. |
 | A fabric is removed or a node reset is explicitly requested. | Follow the distinct lifecycle rules above; never automatically commission or rejoin. |
 
-These scenarios are an offline design review, not runtime lifecycle tests.
+These scenarios are an offline design review, not runtime lifecycle tests. The
+endpoint selector's offline tests exercise the ledger and composition rows with a
+fake store and a synthetic target report.
 The [SDK fixture procedure](SDK_BASELINE.md) demonstrates only a bounded upstream
 sample; it cannot establish production admission, interoperability, certification,
 physical qualification, or parent #4 completion. Future runtime work must provide
