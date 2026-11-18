@@ -1,13 +1,15 @@
 """Offline tests for persistent endpoint selection behind the readiness gate.
 
-Only a fake store and generated synthetic readiness inputs are used. Admitted
-cases patch the in-memory reviewed baseline with a digest computed from a
-synthetic profile; the lock file on disk is never changed.
+Only a fake store, a synthetic Matter target report and generated synthetic
+readiness inputs are used. Admitted cases patch the in-memory reviewed baseline
+with a digest computed from a synthetic profile; the lock file on disk is never
+changed.
 """
 
 from __future__ import annotations
 
 import copy
+import dataclasses
 import json
 import unittest
 from contextlib import contextmanager
@@ -24,8 +26,12 @@ from runtime.endpoint_selection import (
     SELECTION_KEY,
     WITHHELD,
     EndpointSelector,
+    Offer,
+    RelationInstance,
+    RelationKey,
     SelectionStateError,
     StoreError,
+    TargetReport,
 )
 
 
@@ -35,9 +41,17 @@ PIN = "accepted_runtime_composition_profile_sha256"
 NODE = "synthetic-node-a"
 FABRIC_KEY = "sdk-fabric-storage"
 FABRIC_BYTES = b"synthetic opaque sdk-owned bytes"
+PORTAL_KEY = "portal-catalog"
+PORTAL_BYTES = b'{"contributions":[{"resource_id":"synthetic-resource-a","label":"Synthetic heat generator"}]}'
 POWER = "synthetic.heat-generator-family.electrical-power"
 CURRENT = "synthetic.heat-pump-family.electrical-power"
 THIRD = "synthetic.ventilation-family.electrical-power"
+STATUS = "synthetic.heat-generator-family.operating-status"
+RES_A = "synthetic-resource-a"
+RES_B = "synthetic-resource-b"
+RES_C = "synthetic-resource-c"
+RES_REPLACEMENT = "synthetic-resource-a-replacement"
+LENS = "synthetic.lens.matter-electrical"
 
 
 def load_lock() -> dict:
@@ -104,26 +118,48 @@ class FakeStore:
         self.data[key] = bytes(data)
 
 
-class Identities:
-    def __init__(self, prefix: str = "synthetic-identity") -> None:
-        self.prefix = prefix
-        self.calls = 0
+def relation_key(
+    whole: str,
+    part: str,
+    *,
+    pack_id: str = "synthetic.pack.physical",
+    pack_version: str = "1.0.0",
+    definition: str = "synthetic.relation.contains",
+    version: str = "1.0.0",
+) -> RelationKey:
+    return RelationKey(pack_id, pack_version, definition, version, whole, part)
 
-    def __call__(self) -> str:
-        self.calls += 1
-        return f"{self.prefix}-{self.calls:04d}"
+
+def instance(key: RelationKey, core_type: str = "contains", coherence: str = "coherent") -> RelationInstance:
+    return RelationInstance(key, core_type, coherence)
+
+
+def offer(capability: str, resource_id: str, anchor: str = "synthetic-anchor-operator-slot", relations: tuple = ()) -> Offer:
+    return Offer(capability, resource_id, anchor, tuple(relations))
+
+
+def target_report(*offers: Offer, relations: tuple = (), lens: str = LENS) -> TargetReport:
+    return TargetReport(lens, tuple(offers), tuple(relations))
+
+
+def default_report() -> TargetReport:
+    return target_report(offer(POWER, RES_A), offer(CURRENT, RES_B), offer(THIRD, RES_C))
 
 
 def ledger(records: list[dict], node_id: str = NODE) -> bytes:
     return json.dumps({"schema_version": 1, "node_id": node_id, "records": records}).encode("utf-8")
 
 
-def record(identity: str, capability: str, digest: str, endpoint: int) -> dict:
-    return {"identity": identity, "capability": capability, "composition_sha256": digest, "endpoint": endpoint}
+def record(resource_id: str, digest: str, endpoint: int) -> dict:
+    return {"resource_id": resource_id, "composition_sha256": digest, "endpoint": endpoint}
 
 
 def by_capability(result) -> dict:
     return {state.capability: state for state in result.states}
+
+
+def placement(state) -> tuple:
+    return (state.state, state.resource_id, state.endpoint, state.parent_endpoint)
 
 
 class EndpointSelectionTest(unittest.TestCase):
@@ -132,33 +168,36 @@ class EndpointSelectionTest(unittest.TestCase):
         self.composition = synthetic_composition(self.lock)
         self.build = synthetic_build(self.lock)
         self.digest = production_readiness._composition_digest(self.composition)
-        self.store = FakeStore({FABRIC_KEY: FABRIC_BYTES})
-        self.identities = Identities()
+        self.store = FakeStore({FABRIC_KEY: FABRIC_BYTES, PORTAL_KEY: PORTAL_BYTES})
+        self.report = default_report()
 
-    def selector(self, store: FakeStore | None = None, node_id: str = NODE, identities: Identities | None = None) -> EndpointSelector:
-        return EndpointSelector(store or self.store, node_id, new_identity=identities or self.identities)
+    def selector(self, store: FakeStore | None = None, node_id: str = NODE) -> EndpointSelector:
+        return EndpointSelector(store or self.store, node_id)
 
-    def reconcile_admitted(self, selector: EndpointSelector, composition: dict | None = None):
+    def reconcile_admitted(self, selector: EndpointSelector, composition: dict | None = None, report: TargetReport | None = None):
         composition = composition or self.composition
         with admitted(composition) as lock:
             self.assertTrue(production_readiness.evaluate(lock, composition, self.build).permitted)
-            return selector.reconcile(lock, composition, self.build)
+            return selector.reconcile(lock, composition, self.build, report or self.report)
+
+    def stored_records(self, store: FakeStore | None = None) -> list[dict]:
+        return json.loads((store or self.store).data[LEDGER_KEY])["records"]
+
+    # Production readiness stays deny-all.
 
     def test_withheld_production_readiness_allocates_nothing(self) -> None:
         selector = self.selector()
         selector.select(POWER)
         selector.select(CURRENT)
-        for attempt in range(2):
-            result = self.selector().reconcile(self.lock, self.composition, self.build)
+        for _ in range(2):
+            result = self.selector().reconcile(self.lock, self.composition, self.build, self.report)
             self.assertEqual([s.capability for s in result.states], sorted([POWER, CURRENT]))
             for state in result.states:
                 self.assertEqual(state.state, WITHHELD)
                 self.assertIn("no reviewed accepted runtime-composition profile is pinned", state.reasons)
-                self.assertIsNone(state.identity)
-                self.assertIsNone(state.endpoint)
+                self.assertEqual((state.resource_id, state.endpoint, state.parent_endpoint), (None, None, None))
         self.assertNotIn(LEDGER_KEY, self.store.data)
         self.assertNotIn(LEDGER_KEY, self.store.writes)
-        self.assertEqual(self.identities.calls, 0)
         disk = json.loads(LOCK.read_text(encoding="utf-8"))
         self.assertIsNone(disk[PIN])
         self.assertFalse(production_readiness.evaluate(disk, self.composition, self.build).permitted)
@@ -169,65 +208,96 @@ class EndpointSelectionTest(unittest.TestCase):
         other = synthetic_composition(self.lock, "synthetic-electrical-sensor-profile-b")
         with admitted(self.composition) as lock:
             for composition, build in ((None, self.build), (self.composition, None), (other, self.build)):
-                state = selector.reconcile(lock, composition, build).states[0]
+                state = selector.reconcile(lock, composition, build, self.report).states[0]
                 self.assertEqual(state.state, WITHHELD)
                 self.assertIsNone(state.endpoint)
         self.assertNotIn(LEDGER_KEY, self.store.writes)
-        self.assertEqual(self.identities.calls, 0)
 
     def test_unselected_capabilities_are_not_evaluated_or_allocated(self) -> None:
         calls = []
-        selector = EndpointSelector(self.store, NODE, readiness=lambda *args: calls.append(args), new_identity=self.identities)
-        self.assertEqual(selector.reconcile(self.lock, self.composition, self.build).states, ())
+        selector = EndpointSelector(self.store, NODE, readiness=lambda *args: calls.append(args))
+        self.assertEqual(selector.reconcile(self.lock, self.composition, self.build, self.report).states, ())
         self.assertEqual(calls, [])
         self.assertEqual(self.store.writes, [])
 
     def test_non_decision_readiness_result_is_withheld(self) -> None:
-        selector = EndpointSelector(self.store, NODE, readiness=lambda *args: True, new_identity=self.identities)
+        selector = EndpointSelector(self.store, NODE, readiness=lambda *args: True)
         selector.select(POWER)
-        state = selector.reconcile(self.lock, self.composition, self.build).states[0]
+        state = selector.reconcile(self.lock, self.composition, self.build, self.report).states[0]
         self.assertEqual(state.state, WITHHELD)
-        self.assertEqual(self.identities.calls, 0)
+        self.assertNotIn(LEDGER_KEY, self.store.writes)
 
-    def test_admitted_allocation_is_persisted_before_eligibility(self) -> None:
+    # A ledger record carries the resource and the composition.
+
+    def test_ledger_record_carries_resource_and_composition(self) -> None:
         selector = self.selector()
         selector.select(POWER)
         selector.select(CURRENT)
         result = self.reconcile_admitted(selector)
         states = by_capability(result)
         self.assertEqual(result.faults, ())
-        self.assertEqual({s.state for s in result.states}, {ELIGIBLE})
-        self.assertNotEqual(states[POWER].identity, states[CURRENT].identity)
-        self.assertEqual(sorted(s.endpoint for s in result.states), [1, 2])
+        self.assertEqual(placement(states[POWER]), (ELIGIBLE, RES_A, 1, None))
+        self.assertEqual(placement(states[CURRENT]), (ELIGIBLE, RES_B, 2, None))
+        self.assertEqual(RECORD_FIELDS, frozenset({"resource_id", "composition_sha256", "endpoint"}))
         stored = json.loads(self.store.data[LEDGER_KEY])
         self.assertEqual(stored["node_id"], NODE)
-        for item in stored["records"]:
-            self.assertEqual(set(item), RECORD_FIELDS)
-            self.assertEqual(item["composition_sha256"], self.digest)
-            self.assertEqual((item["identity"], item["endpoint"]), (states[item["capability"]].identity, states[item["capability"]].endpoint))
+        self.assertEqual(stored["records"], [record(RES_A, self.digest, 1), record(RES_B, self.digest, 2)])
 
-    def test_identity_and_endpoint_survive_restart(self) -> None:
+    def test_capabilities_on_one_resource_share_its_endpoint(self) -> None:
+        selector = self.selector()
+        selector.select(POWER)
+        selector.select(STATUS)
+        report = target_report(offer(POWER, RES_A), offer(STATUS, RES_A))
+        states = by_capability(self.reconcile_admitted(selector, report=report))
+        self.assertEqual(placement(states[POWER]), (ELIGIBLE, RES_A, 1, None))
+        self.assertEqual(placement(states[STATUS]), (ELIGIBLE, RES_A, 1, None))
+        self.assertEqual(self.stored_records(), [record(RES_A, self.digest, 1)])
+
+    def test_endpoint_survives_restart(self) -> None:
         selector = self.selector()
         selector.select(POWER)
         first = self.reconcile_admitted(selector).states[0]
         writes = list(self.store.writes)
-        restarted = self.selector(identities=Identities("synthetic-restart"))
-        second = self.reconcile_admitted(restarted).states[0]
-        self.assertEqual((second.state, second.identity, second.endpoint), (ELIGIBLE, first.identity, first.endpoint))
+        second = self.reconcile_admitted(self.selector()).states[0]
+        self.assertEqual(placement(second), placement(first))
         self.assertEqual(self.store.writes, writes)
+
+    def test_anchor_supersession_keeps_the_endpoint(self) -> None:
+        selector = self.selector()
+        selector.select(POWER)
+        before = target_report(offer(POWER, RES_A, anchor="synthetic-anchor-operator-slot"))
+        first = self.reconcile_admitted(selector, report=before).states[0]
+        persisted = self.store.data[LEDGER_KEY]
+        after = target_report(offer(POWER, RES_A, anchor="synthetic-anchor-native-identity"))
+        second = self.reconcile_admitted(self.selector(), report=after).states[0]
+        self.assertEqual(placement(second), (ELIGIBLE, RES_A, first.endpoint, None))
+        self.assertEqual(self.store.data[LEDGER_KEY], persisted)
+
+    def test_replaced_equipment_gets_a_new_endpoint_and_the_old_number_stays_retired(self) -> None:
+        selector = self.selector()
+        selector.select(POWER)
+        selector.select(CURRENT)
+        first = by_capability(self.reconcile_admitted(selector))
+        replaced = target_report(offer(POWER, RES_REPLACEMENT, anchor="synthetic-anchor-replacement-unit"), offer(CURRENT, RES_B))
+        second = by_capability(self.reconcile_admitted(selector, report=replaced))
+        self.assertEqual(placement(second[POWER]), (ELIGIBLE, RES_REPLACEMENT, 3, None))
+        self.assertEqual(placement(second[CURRENT]), placement(first[CURRENT]))
+        self.assertEqual(self.stored_records(), [record(RES_A, self.digest, 1), record(RES_B, self.digest, 2), record(RES_REPLACEMENT, self.digest, 3)])
+        back = by_capability(self.reconcile_admitted(selector))
+        self.assertEqual(placement(back[POWER]), placement(first[POWER]))
 
     def test_withheld_after_admission_keeps_the_ledger_intact(self) -> None:
         selector = self.selector()
         selector.select(POWER)
         first = self.reconcile_admitted(selector).states[0]
         persisted = self.store.data[LEDGER_KEY]
-        withheld = selector.reconcile(self.lock, self.composition, self.build).states[0]
-        self.assertEqual((withheld.state, withheld.identity, withheld.endpoint), (WITHHELD, None, None))
+        withheld = selector.reconcile(self.lock, self.composition, self.build, self.report).states[0]
+        self.assertEqual(placement(withheld), (WITHHELD, None, None, None))
         self.assertEqual(self.store.data[LEDGER_KEY], persisted)
         again = self.reconcile_admitted(selector).states[0]
-        self.assertEqual((again.identity, again.endpoint), (first.identity, first.endpoint))
+        self.assertEqual(placement(again), placement(first))
 
-    def test_deselect_and_reselect_reuse_identity(self) -> None:
+    def test_deselect_and_reselect_reuse_the_endpoint(self) -> None:
         selector = self.selector()
         selector.select(POWER)
         first = self.reconcile_admitted(selector).states[0]
@@ -236,8 +306,8 @@ class EndpointSelectionTest(unittest.TestCase):
         self.assertEqual(self.reconcile_admitted(selector).states, ())
         self.assertEqual(self.store.data[LEDGER_KEY], persisted)
         selector.select(POWER)
-        again = self.reconcile_admitted(self.selector(identities=Identities("synthetic-reselect"))).states[0]
-        self.assertEqual((again.state, again.identity, again.endpoint), (ELIGIBLE, first.identity, first.endpoint))
+        again = self.reconcile_admitted(self.selector()).states[0]
+        self.assertEqual(placement(again), placement(first))
 
     def test_retired_endpoint_number_is_not_reassigned(self) -> None:
         selector = self.selector()
@@ -246,68 +316,262 @@ class EndpointSelectionTest(unittest.TestCase):
         selector.deselect(POWER)
         selector.select(CURRENT)
         second = self.reconcile_admitted(selector).states[0]
-        self.assertEqual(second.capability, CURRENT)
-        self.assertNotEqual(second.identity, first.identity)
+        self.assertEqual((second.capability, second.resource_id), (CURRENT, RES_B))
         self.assertEqual(second.endpoint, first.endpoint + 1)
 
-    def test_composition_change_withholds_without_new_identity(self) -> None:
+    def test_composition_change_withholds_and_keeps_the_record(self) -> None:
         selector = self.selector()
         selector.select(POWER)
         self.reconcile_admitted(selector)
         persisted = self.store.data[LEDGER_KEY]
-        calls = self.identities.calls
         other = synthetic_composition(self.lock, "synthetic-electrical-sensor-profile-b")
         state = self.reconcile_admitted(selector, other).states[0]
-        self.assertEqual((state.state, state.identity, state.endpoint), (WITHHELD, None, None))
+        self.assertEqual(placement(state), (WITHHELD, None, None, None))
         self.assertIn("different composition", state.reasons[0])
         self.assertEqual(self.store.data[LEDGER_KEY], persisted)
-        self.assertEqual(self.identities.calls, calls)
 
     def test_other_node_lifecycle_ledger_is_withheld_and_preserved(self) -> None:
         selector = self.selector()
         selector.select(POWER)
         self.reconcile_admitted(selector)
         persisted = self.store.data[LEDGER_KEY]
-        other_node = self.selector(node_id="synthetic-node-b")
-        result = self.reconcile_admitted(other_node)
+        result = self.reconcile_admitted(self.selector(node_id="synthetic-node-b"))
         self.assertEqual(result.states[0].state, WITHHELD)
         self.assertIn("different node lifecycle", result.faults[0])
         self.assertEqual(self.store.data[LEDGER_KEY], persisted)
 
-    def test_duplicate_capability_records_withhold_only_that_capability(self) -> None:
-        records = [
-            record("synthetic-identity-a001", POWER, self.digest, 1),
-            record("synthetic-identity-a002", POWER, self.digest, 2),
-            record("synthetic-identity-a003", CURRENT, self.digest, 3),
-        ]
+    # Parent and child endpoints follow the cited relations.
+
+    def composed_report(self, part_relations: tuple, relations: tuple, whole_relations: tuple = ()) -> TargetReport:
+        return target_report(offer(POWER, RES_A, relations=whole_relations), offer(CURRENT, RES_B, relations=part_relations), relations=relations)
+
+    def test_parent_and_child_endpoints_follow_the_cited_relation(self) -> None:
+        selector = self.selector()
+        selector.select(POWER)
+        selector.select(CURRENT)
+        key = relation_key(RES_A, RES_B)
+        states = by_capability(self.reconcile_admitted(selector, report=self.composed_report((key,), (instance(key),))))
+        self.assertEqual(placement(states[POWER]), (ELIGIBLE, RES_A, 1, None))
+        self.assertEqual(placement(states[CURRENT]), (ELIGIBLE, RES_B, 2, 1))
+        self.assertEqual(states[CURRENT].reasons, ())
+        self.assertEqual(self.stored_records(), [record(RES_A, self.digest, 1), record(RES_B, self.digest, 2)])
+
+    def test_parent_relation_cited_by_the_whole_also_composes(self) -> None:
+        selector = self.selector()
+        selector.select(POWER)
+        selector.select(CURRENT)
+        key = relation_key(RES_A, RES_B)
+        report = self.composed_report((), (instance(key),), whole_relations=(key,))
+        self.assertEqual(by_capability(self.reconcile_admitted(selector, report=report))[CURRENT].parent_endpoint, 1)
+
+    def test_every_relation_key_field_must_match_the_published_instance(self) -> None:
+        """Fields varied: pack_id, pack_version, definition, version, from_resource, to_resource."""
+        cited = relation_key(RES_A, RES_B)
+        published = {
+            "pack_id": dataclasses.replace(cited, pack_id="synthetic.pack.other"),
+            "pack_version": dataclasses.replace(cited, pack_version="1.0.1"),
+            "definition": dataclasses.replace(cited, definition="synthetic.relation.other"),
+            "version": dataclasses.replace(cited, version="1.0.1"),
+            "from_resource": dataclasses.replace(cited, from_resource=RES_C),
+            "to_resource": dataclasses.replace(cited, to_resource=RES_C),
+        }
+        for name, key in published.items():
+            with self.subTest(field=name):
+                store = FakeStore()
+                selector = self.selector(store)
+                for capability in (POWER, CURRENT, THIRD):
+                    selector.select(capability)
+                report = target_report(offer(POWER, RES_A), offer(CURRENT, RES_B, relations=(cited,)), offer(THIRD, RES_C), relations=(instance(key),))
+                states = by_capability(self.reconcile_admitted(selector, report=report))
+                self.assertEqual(placement(states[CURRENT]), (ELIGIBLE, RES_B, 2, None))
+                self.assertIn("not a coherent published instance", states[CURRENT].reasons[0])
+                self.assertEqual(states[THIRD].parent_endpoint, None)
+
+    def test_unusable_parent_relations_present_the_endpoint_under_no_parent(self) -> None:
+        key = relation_key(RES_A, RES_B)
+        second = relation_key(RES_C, RES_B, definition="synthetic.relation.contains-other")
+        cases = {
+            "uncited": ((), (instance(key),), None),
+            "not published": ((key,), (), "not a coherent published instance"),
+            "not coherent": ((key,), (instance(key, coherence="conflict"),), "not a coherent published instance"),
+            "duplicate instance": ((key,), (instance(key), instance(key, coherence="candidate")), "not a coherent published instance"),
+            "two parents": ((key, second), (instance(key), instance(second)), "more than one parent"),
+            "contains and hosts": ((key, second), (instance(key), instance(second, core_type="hosts")), "more than one parent"),
+        }
+        for name, (cited, relations, reason) in cases.items():
+            with self.subTest(name):
+                store = FakeStore()
+                selector = self.selector(store)
+                for capability in (POWER, CURRENT, THIRD):
+                    selector.select(capability)
+                report = target_report(offer(POWER, RES_A), offer(CURRENT, RES_B, relations=cited), offer(THIRD, RES_C), relations=relations)
+                result = self.reconcile_admitted(selector, report=report)
+                state = by_capability(result)[CURRENT]
+                self.assertEqual(placement(state), (ELIGIBLE, RES_B, 2, None))
+                if reason is None:
+                    self.assertEqual(state.reasons, ())
+                else:
+                    self.assertIn(reason, state.reasons[0])
+                self.assertEqual(self.stored_records(store), [record(RES_A, self.digest, 1), record(RES_B, self.digest, 2), record(RES_C, self.digest, 3)])
+
+    def test_only_forest_relations_make_a_parent(self) -> None:
+        key = relation_key(RES_A, RES_B)
+        for core_type, parent in (("contains", 1), ("hosts", 1), ("groups", None), ("measures", None), ("supplies", None), ("controls", None), ("relays", None)):
+            with self.subTest(core_type=core_type):
+                store = FakeStore()
+                selector = self.selector(store)
+                selector.select(POWER)
+                selector.select(CURRENT)
+                report = self.composed_report((key,), (instance(key, core_type=core_type),))
+                state = by_capability(self.reconcile_admitted(selector, report=report))[CURRENT]
+                self.assertEqual(placement(state), (ELIGIBLE, RES_B, 2, parent))
+                self.assertEqual(state.reasons, ())
+
+    def test_parent_without_an_eligible_endpoint_is_not_used(self) -> None:
+        selector = self.selector()
+        selector.select(CURRENT)
+        key = relation_key(RES_A, RES_B)
+        state = self.reconcile_admitted(selector, report=self.composed_report((key,), (instance(key),))).states[0]
+        self.assertEqual(placement(state), (ELIGIBLE, RES_B, 1, None))
+        self.assertIn("parent resource has no eligible endpoint", state.reasons[0])
+
+    def test_relation_cycle_presents_its_members_under_no_parent(self) -> None:
+        selector = self.selector()
+        selector.select(POWER)
+        selector.select(CURRENT)
+        down, up = relation_key(RES_A, RES_B), relation_key(RES_B, RES_A)
+        report = self.composed_report((down,), (instance(down), instance(up)), whole_relations=(up,))
+        states = by_capability(self.reconcile_admitted(selector, report=report))
+        for capability in (POWER, CURRENT):
+            self.assertEqual(states[capability].parent_endpoint, None)
+            self.assertIn("cycle", states[capability].reasons[0])
+
+    def test_changed_relations_move_the_child_without_rewriting_the_ledger(self) -> None:
+        selector = self.selector()
+        for capability in (POWER, CURRENT, THIRD):
+            selector.select(capability)
+        under_a = relation_key(RES_A, RES_B)
+        report_a = target_report(offer(POWER, RES_A), offer(CURRENT, RES_B, relations=(under_a,)), offer(THIRD, RES_C), relations=(instance(under_a),))
+        first = by_capability(self.reconcile_admitted(selector, report=report_a))
+        persisted = self.store.data[LEDGER_KEY]
+        under_c = relation_key(RES_C, RES_B)
+        report_c = target_report(offer(POWER, RES_A), offer(CURRENT, RES_B, relations=(under_c,)), offer(THIRD, RES_C), relations=(instance(under_c),))
+        second = by_capability(self.reconcile_admitted(selector, report=report_c))
+        self.assertEqual(first[CURRENT].parent_endpoint, first[POWER].endpoint)
+        self.assertEqual(second[CURRENT].parent_endpoint, second[THIRD].endpoint)
+        self.assertEqual(second[CURRENT].endpoint, first[CURRENT].endpoint)
+        self.assertEqual(self.store.data[LEDGER_KEY], persisted)
+
+    # Withdrawing a Portal contribution leaves the ledger unchanged.
+
+    def test_withdrawing_a_portal_contribution_leaves_the_ledger_unchanged(self) -> None:
+        selector = self.selector()
+        selector.select(POWER)
+        selector.select(CURRENT)
+        key = relation_key(RES_A, RES_B)
+        report = self.composed_report((key,), (instance(key),))
+        first = self.reconcile_admitted(selector, report=report)
+        persisted = self.store.data[LEDGER_KEY]
+        del self.store.data[PORTAL_KEY]
+        second = self.reconcile_admitted(self.selector(), report=report)
+        self.store.data[PORTAL_KEY] = b"{not a portal catalog"
+        third = self.reconcile_admitted(self.selector(), report=report)
+        self.assertEqual(second, first)
+        self.assertEqual(third, first)
+        self.assertEqual(self.store.data[LEDGER_KEY], persisted)
+        self.assertNotIn(PORTAL_KEY, self.store.reads)
+        self.assertNotIn(PORTAL_KEY, self.store.writes)
+
+    def test_offer_absent_from_the_target_report_is_withheld_and_keeps_its_record(self) -> None:
+        selector = self.selector()
+        selector.select(POWER)
+        selector.select(CURRENT)
+        first = by_capability(self.reconcile_admitted(selector))
+        persisted = self.store.data[LEDGER_KEY]
+        state = by_capability(self.reconcile_admitted(selector, report=target_report(offer(CURRENT, RES_B))))[POWER]
+        self.assertEqual(placement(state), (WITHHELD, None, None, None))
+        self.assertIn("no offer", state.reasons[0])
+        self.assertEqual(self.store.data[LEDGER_KEY], persisted)
+        again = by_capability(self.reconcile_admitted(selector))
+        self.assertEqual(placement(again[POWER]), placement(first[POWER]))
+
+    def test_malformed_or_ambiguous_offers_are_withheld(self) -> None:
+        bad_key = relation_key(RES_A, RES_B, pack_id=" padded")
+        cases = {
+            "resource not opaque": offer(POWER, "synthetic resource"),
+            "resource empty": offer(POWER, ""),
+            "anchor empty": offer(POWER, RES_A, anchor=""),
+            "relation not a key": Offer(POWER, RES_A, "synthetic-anchor", ("synthetic-relation",)),
+            "relation key malformed": offer(POWER, RES_A, relations=(bad_key,)),
+            "relations not a tuple": Offer(POWER, RES_A, "synthetic-anchor", [relation_key(RES_A, RES_B)]),
+        }
+        for name, bad in cases.items():
+            with self.subTest(name):
+                store = FakeStore()
+                selector = self.selector(store)
+                selector.select(POWER)
+                selector.select(CURRENT)
+                states = by_capability(self.reconcile_admitted(selector, report=target_report(bad, offer(CURRENT, RES_B))))
+                self.assertEqual(placement(states[POWER]), (WITHHELD, None, None, None))
+                self.assertEqual(placement(states[CURRENT]), (ELIGIBLE, RES_B, 1, None))
+        store = FakeStore()
+        selector = self.selector(store)
+        selector.select(POWER)
+        duplicate = target_report(offer(POWER, RES_A), offer(POWER, RES_B))
+        state = self.reconcile_admitted(selector, report=duplicate).states[0]
+        self.assertEqual(state.state, WITHHELD)
+        self.assertIn("more than one offer", state.reasons[0])
+        self.assertNotIn(LEDGER_KEY, store.writes)
+
+    def test_malformed_target_report_withholds_everything(self) -> None:
+        cases = {
+            "absent": None,
+            "not a report": {"lens": LENS, "offers": [], "relations": []},
+            "lens empty": target_report(offer(POWER, RES_A), lens=""),
+            "offers not a tuple": TargetReport(LENS, [offer(POWER, RES_A)], ()),
+            "offer not an offer": TargetReport(LENS, ({"capability": POWER},), ()),
+            "relations not a tuple": TargetReport(LENS, (offer(POWER, RES_A),), []),
+        }
+        for name, report in cases.items():
+            with self.subTest(name):
+                store = FakeStore()
+                selector = self.selector(store)
+                selector.select(POWER)
+                with admitted(self.composition) as lock:
+                    state = selector.reconcile(lock, self.composition, self.build, report).states[0]
+                self.assertEqual(placement(state), (WITHHELD, None, None, None))
+                self.assertIn("target report", state.reasons[0])
+                self.assertNotIn(LEDGER_KEY, store.writes)
+
+    def test_malformed_relation_instances_are_never_used(self) -> None:
+        key = relation_key(RES_A, RES_B)
+        for bad in ("synthetic-relation", RelationInstance(key, "", "coherent"), RelationInstance(key, "contains", " "), RelationInstance("synthetic-key", "contains", "coherent")):
+            with self.subTest(bad=bad):
+                store = FakeStore()
+                selector = self.selector(store)
+                selector.select(POWER)
+                selector.select(CURRENT)
+                state = by_capability(self.reconcile_admitted(selector, report=self.composed_report((key,), (bad,))))[CURRENT]
+                self.assertEqual(placement(state), (ELIGIBLE, RES_B, 2, None))
+                self.assertIn("not a coherent published instance", state.reasons[0])
+
+    # Persisted ledger faults stay fail closed.
+
+    def test_duplicate_resource_records_withhold_only_that_resource(self) -> None:
+        records = [record(RES_A, self.digest, 1), record(RES_A, self.digest, 2), record(RES_B, self.digest, 3)]
         self.store.data[LEDGER_KEY] = ledger(records)
         selector = self.selector()
         for capability in (POWER, CURRENT, THIRD):
             selector.select(capability)
         states = by_capability(self.reconcile_admitted(selector))
         self.assertEqual(states[POWER].state, WITHHELD)
-        self.assertIn("capability has duplicate persisted endpoint records", states[POWER].reasons)
-        self.assertEqual((states[CURRENT].state, states[CURRENT].identity, states[CURRENT].endpoint), (ELIGIBLE, "synthetic-identity-a003", 3))
-        self.assertEqual((states[THIRD].state, states[THIRD].endpoint), (ELIGIBLE, 4))
-        self.assertEqual(json.loads(self.store.data[LEDGER_KEY])["records"][:3], records)
-
-    def test_duplicate_identity_withholds_both_records(self) -> None:
-        self.store.data[LEDGER_KEY] = ledger([
-            record("synthetic-identity-a001", POWER, self.digest, 1),
-            record("synthetic-identity-a001", CURRENT, self.digest, 2),
-        ])
-        selector = self.selector()
-        selector.select(POWER)
-        selector.select(CURRENT)
-        for state in self.reconcile_admitted(selector).states:
-            self.assertEqual(state.state, WITHHELD)
-            self.assertIn("persisted identity is shared with another record", state.reasons)
+        self.assertIn("resource has duplicate persisted endpoint records", states[POWER].reasons)
+        self.assertEqual(placement(states[CURRENT]), (ELIGIBLE, RES_B, 3, None))
+        self.assertEqual(placement(states[THIRD]), (ELIGIBLE, RES_C, 4, None))
+        self.assertEqual(self.stored_records()[:3], records)
 
     def test_duplicate_endpoint_withholds_both_and_new_number_skips_it(self) -> None:
-        self.store.data[LEDGER_KEY] = ledger([
-            record("synthetic-identity-a001", POWER, self.digest, 7),
-            record("synthetic-identity-a002", CURRENT, self.digest, 7),
-        ])
+        self.store.data[LEDGER_KEY] = ledger([record(RES_A, self.digest, 7), record(RES_B, self.digest, 7)])
         selector = self.selector()
         for capability in (POWER, CURRENT, THIRD):
             selector.select(capability)
@@ -319,15 +583,15 @@ class EndpointSelectionTest(unittest.TestCase):
 
     def test_duplicate_handling_is_independent_of_record_order(self) -> None:
         records = [
-            record("synthetic-identity-a001", POWER, self.digest, 1),
-            record("synthetic-identity-a002", POWER, self.digest, 1),
-            {"identity": "synthetic-identity-a003", "capability": CURRENT, "endpoint": 2},
-            record("synthetic-identity-a004", CURRENT, self.digest, 3),
+            record(RES_A, self.digest, 1),
+            record(RES_A, self.digest, 2),
+            {"resource_id": RES_B, "endpoint": 3},
+            record(RES_B, self.digest, 4),
         ]
         outcomes = []
         for ordering in (records, list(reversed(records)), records[2:] + records[:2]):
             store = FakeStore({LEDGER_KEY: ledger(ordering)})
-            selector = self.selector(store, identities=Identities())
+            selector = self.selector(store)
             selector.select(POWER)
             selector.select(CURRENT)
             outcomes.append(self.reconcile_admitted(selector))
@@ -347,53 +611,61 @@ class EndpointSelectionTest(unittest.TestCase):
         for name, data in variants.items():
             with self.subTest(name):
                 store = FakeStore({LEDGER_KEY: data})
-                identities = Identities()
-                selector = self.selector(store, identities=identities)
+                selector = self.selector(store)
                 selector.select(POWER)
                 result = self.reconcile_admitted(selector)
                 self.assertEqual(result.states[0].state, WITHHELD)
                 self.assertTrue(result.faults)
                 self.assertEqual(store.data[LEDGER_KEY], data)
                 self.assertNotIn(LEDGER_KEY, store.writes)
-                self.assertEqual(identities.calls, 0)
 
     def test_malformed_record_preserves_valid_restore_and_blocks_new_allocation(self) -> None:
         malformed = [
-            {"identity": "synthetic-identity-a002", "capability": CURRENT, "composition_sha256": self.digest, "endpoint": True},
-            {"identity": "short", "capability": CURRENT, "composition_sha256": self.digest, "endpoint": 2},
-            {"identity": "synthetic-identity-a002", "capability": CURRENT, "composition_sha256": self.digest.upper(), "endpoint": 2},
-            {"identity": "synthetic-identity-a002", "capability": CURRENT, "composition_sha256": self.digest, "endpoint": 0},
-            {"identity": "synthetic-identity-a002", "capability": CURRENT, "composition_sha256": self.digest, "endpoint": 2, "fabric": "x"},
-            {"identity": "synthetic-identity-a002", "capability": " ", "composition_sha256": self.digest, "endpoint": 2},
+            {"resource_id": RES_B, "composition_sha256": self.digest, "endpoint": True},
+            {"resource_id": "synthetic resource", "composition_sha256": self.digest, "endpoint": 2},
+            {"resource_id": RES_B, "composition_sha256": self.digest.upper(), "endpoint": 2},
+            {"resource_id": RES_B, "composition_sha256": self.digest, "endpoint": 0},
+            {"resource_id": RES_B, "composition_sha256": self.digest, "endpoint": 2, "fabric": "x"},
+            {"resource_id": "", "composition_sha256": self.digest, "endpoint": 2},
+            {"identity": "synthetic-identity-a002", "capability": CURRENT, "composition_sha256": self.digest, "endpoint": 2},
         ]
         for bad in malformed:
             with self.subTest(bad=bad):
-                data = ledger([record("synthetic-identity-a001", POWER, self.digest, 1), bad])
+                data = ledger([record(RES_A, self.digest, 1), bad])
                 store = FakeStore({LEDGER_KEY: data})
-                identities = Identities()
-                selector = self.selector(store, identities=identities)
+                selector = self.selector(store)
                 for capability in (POWER, CURRENT, THIRD):
                     selector.select(capability)
                 result = self.reconcile_admitted(selector)
                 states = by_capability(result)
-                self.assertEqual((states[POWER].state, states[POWER].identity, states[POWER].endpoint), (ELIGIBLE, "synthetic-identity-a001", 1))
+                self.assertEqual(placement(states[POWER]), (ELIGIBLE, RES_A, 1, None))
                 self.assertEqual(states[CURRENT].state, WITHHELD)
                 self.assertEqual(states[THIRD].state, WITHHELD)
                 self.assertTrue(result.faults)
                 self.assertEqual(store.data[LEDGER_KEY], data)
-                self.assertEqual(identities.calls, 0)
 
     def test_failed_ledger_write_is_not_exposed(self) -> None:
         selector = self.selector()
         selector.select(POWER)
         self.store.fail_writes.add(LEDGER_KEY)
         result = self.reconcile_admitted(selector)
-        self.assertEqual((result.states[0].state, result.states[0].endpoint), (WITHHELD, None))
+        self.assertEqual(placement(result.states[0]), (WITHHELD, None, None, None))
         self.assertIn("endpoint ledger could not be persisted", result.states[0].reasons)
         self.assertNotIn(LEDGER_KEY, self.store.data)
         self.store.fail_writes.clear()
         state = self.reconcile_admitted(selector).states[0]
-        self.assertEqual((state.state, state.endpoint), (ELIGIBLE, 1))
+        self.assertEqual(placement(state), (ELIGIBLE, RES_A, 1, None))
+
+    def test_failed_ledger_write_never_presents_a_parent(self) -> None:
+        self.store.data[LEDGER_KEY] = ledger([record(RES_A, self.digest, 1)])
+        self.store.fail_writes.add(LEDGER_KEY)
+        selector = self.selector()
+        selector.select(POWER)
+        selector.select(CURRENT)
+        key = relation_key(RES_A, RES_B)
+        states = by_capability(self.reconcile_admitted(selector, report=self.composed_report((key,), (instance(key),))))
+        self.assertEqual(placement(states[POWER]), (ELIGIBLE, RES_A, 1, None))
+        self.assertEqual(placement(states[CURRENT]), (WITHHELD, None, None, None))
 
     def test_unreadable_ledger_is_withheld(self) -> None:
         class ReadFailure(FakeStore):
@@ -409,18 +681,8 @@ class EndpointSelectionTest(unittest.TestCase):
         self.assertEqual(result.states[0].state, WITHHELD)
         self.assertNotIn(LEDGER_KEY, store.writes)
 
-    def test_generated_identity_collision_or_malformed_value_is_withheld(self) -> None:
-        self.store.data[LEDGER_KEY] = ledger([record("synthetic-identity-0001", POWER, self.digest, 1)])
-        for generated in ("synthetic-identity-0001", "bad id"):
-            with self.subTest(generated=generated):
-                selector = EndpointSelector(self.store, NODE, new_identity=lambda: generated)
-                selector.select(CURRENT)
-                state = by_capability(self.reconcile_admitted(selector))[CURRENT]
-                self.assertEqual((state.state, state.endpoint), (WITHHELD, None))
-                self.assertEqual(len(json.loads(self.store.data[LEDGER_KEY])["records"]), 1)
-
     def test_exhausted_endpoint_space_is_withheld(self) -> None:
-        self.store.data[LEDGER_KEY] = ledger([record("synthetic-identity-a001", POWER, self.digest, LAST_ENDPOINT)])
+        self.store.data[LEDGER_KEY] = ledger([record(RES_A, self.digest, LAST_ENDPOINT)])
         selector = self.selector()
         selector.select(CURRENT)
         state = by_capability(self.reconcile_admitted(selector))[CURRENT]
@@ -455,12 +717,12 @@ class EndpointSelectionTest(unittest.TestCase):
         selector = self.selector()
         selector.select(POWER)
         selector.select(CURRENT)
-        selector.reconcile(self.lock, self.composition, self.build)
+        selector.reconcile(self.lock, self.composition, self.build, self.report)
         self.reconcile_admitted(selector)
         selector.deselect(POWER)
         self.reconcile_admitted(selector)
         selector.select(POWER)
-        self.reconcile_admitted(self.selector(identities=Identities("synthetic-restart")))
+        self.reconcile_admitted(self.selector())
         self.assertEqual(self.store.data[FABRIC_KEY], FABRIC_BYTES)
         self.assertNotIn(FABRIC_KEY, self.store.reads)
         self.assertNotIn(FABRIC_KEY, self.store.writes)
